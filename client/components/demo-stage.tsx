@@ -1,25 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { AgentStatusStrip } from "@/components/agent/status-strip";
+import { DecisionVerdictList } from "@/components/agent/decision-verdict";
+import { LiveTrace } from "@/components/agent/live-trace";
 import { ConnectButton } from "@/components/connect-button";
 import { useConsole } from "@/components/console-data";
 import { Estop, EstopCaption } from "@/components/estop";
 import { Gauge } from "@/components/gauge";
+import { Shell } from "@/components/layout";
 import { LockoutTag } from "@/components/lockout-tag";
-import { Ticker } from "@/components/ticker";
 import { formatFixed6 } from "@/lib/format";
+import { useAgent } from "@/lib/use-agent";
 
 /**
  * The judge stage.
  *
- * Built to be read across a room: large type, three buttons, one trace. The agent service is
- * optional — with no `NEXT_PUBLIC_AGENT_URL` reachable the page runs in watch mode, showing the
- * same live trace from chain data with the run buttons disabled and a line saying why. Watch mode
- * is the useful half anyway: the argument is what the *contract* did, not what triggered it.
+ * Built to answer the requirement in one screen: an agent running unsupervised, attempting to
+ * exceed its policy, and being blocked. Top to bottom that is — is it alive, what is it thinking,
+ * and what did the chain do about it.
+ *
+ * Everything below the status strip works with the agent process down; it falls back to persisted
+ * chain data and says so. The argument is what the *contract* did, and that is recorded whether or
+ * not the agent is currently talking.
  */
-
-const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:8000";
 
 const SCENARIOS = [
   {
@@ -45,38 +50,24 @@ const SCENARIOS = [
     title: "Freeze mid-flight",
     path: "/demo/scenario/c?legs=3&amount_usdc=20",
     expect:
-      "Starts a three-leg run with 20s between legs. Hold the switch while it is running and the rest never happens.",
+      "Starts a three-leg run with a pause between legs. Hold the switch while it runs and the rest never happens.",
     outcome: "WalletPaused",
   },
 ] as const;
+
+const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:8000";
 
 type TraceLine = { id: number; text: string; tone: "note" | "good" | "bad" };
 
 export function DemoStage() {
   const { data, freeze, paused, toggleFreeze, connectError } = useConsole();
+  const agent = useAgent();
 
-  const [agentUp, setAgentUp] = useState<boolean | null>(null);
   const [running, setRunning] = useState<string | null>(null);
-  const [trace, setTrace] = useState<TraceLine[]>([]);
+  const [log, setLog] = useState<TraceLine[]>([]);
 
   const say = useCallback((text: string, tone: TraceLine["tone"] = "note") => {
-    setTrace((lines) => [{ id: Date.now() + Math.random(), text, tone }, ...lines].slice(0, 40));
-  }, []);
-
-  // Probe once. A failed probe is information, not an error to swallow.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch(`${AGENT_URL}/health`, { cache: "no-store" });
-        if (!cancelled) setAgentUp(response.ok);
-      } catch {
-        if (!cancelled) setAgentUp(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    setLog((lines) => [{ id: Date.now() + Math.random(), text, tone }, ...lines].slice(0, 12));
   }, []);
 
   async function run(scenario: (typeof SCENARIOS)[number]) {
@@ -88,115 +79,108 @@ export function DemoStage() {
       const payload = await response.json();
 
       if (!response.ok) {
-        say(payload.detail ?? `Agent returned ${response.status}`, "bad");
+        say(payload.detail ?? "The agent could not run that scenario", "bad");
       } else if (scenario.id === "c") {
-        say("Run started. Legs land ~20s apart — freeze it now.", "good");
+        say("Run started. Legs land seconds apart — freeze it now.", "good");
       } else {
         if (payload.note) say(payload.note);
         if (payload.injectionFollowed === false) {
-          say("Model declined the injection. Running the rogue variant instead…");
+          say("The model declined the injection. Running it without a model instead…");
           const rogue = await fetch(`${AGENT_URL}/demo/scenario/b-rogue`, { method: "POST" });
-          const rogueBody = await rogue.json();
+          const body = await rogue.json();
           say(
-            rogueBody.error
-              ? `Refused on chain: ${rogueBody.error}`
-              : `Broadcast ${rogueBody.txHash ?? ""}`,
-            rogueBody.error ? "bad" : "good",
+            body.error ? `Refused on chain: ${body.error}` : `Broadcast ${body.txHash ?? ""}`,
+            body.error ? "bad" : "good",
           );
         }
-        say("Done. Watch the trace below for what the contract decided.", "good");
+        say("Done. The verdict is below.", "good");
       }
     } catch {
-      say("Could not reach the agent service.", "bad");
-      setAgentUp(false);
+      say("The agent is not reachable", "bad");
     } finally {
       setRunning(null);
     }
   }
 
   const state = data.state;
+  const offline = agent.online === false;
 
   return (
     <main className="flex min-h-svh flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-black/45 px-6 py-4 sm:px-10">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <Link href="/" className="legend text-placard/70 transition-colors hover:text-placard">
-            ← Kill Switch
-          </Link>
-          <span className="flex items-center gap-2">
-            <span
-              className={`led ${agentUp === null ? "led-off" : agentUp ? "led-running" : "led-stopped"}`}
-              aria-hidden="true"
-            />
-            <span className="legend text-placard/55">
-              {agentUp === null ? "Checking agent…" : agentUp ? "Agent reachable" : "Watch mode"}
+      <header className="border-b border-black/45">
+        <Shell className="flex flex-wrap items-center justify-between gap-4 py-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <Link href="/" className="legend text-placard/70 transition-colors hover:text-placard">
+              ← Kill Switch
+            </Link>
+            <span className="flex items-center gap-2">
+              <span
+                className={`led ${data.connected ? "led-running" : "led-off"}`}
+                aria-hidden="true"
+              />
+              <span className="legend text-placard/55">
+                {data.connected ? "Chain live" : "Chain offline"}
+              </span>
             </span>
-          </span>
-        </div>
-        <ConnectButton />
+            {data.indexerStale && (
+              <span className="legend text-hazard">Figures may be behind</span>
+            )}
+          </div>
+          <ConnectButton />
+        </Shell>
       </header>
 
-      <div className="grid flex-1 grid-cols-1 gap-10 px-6 py-10 sm:px-10 xl:grid-cols-[1.35fr_auto]">
+      <Shell className="grid flex-1 grid-cols-1 gap-x-16 gap-y-10 py-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0">
           <h1 className="display text-panel text-placard sm:text-display sm:leading-[0.9]">
-            Three scenarios
+            An agent, governed
           </h1>
+          <p className="measure mt-5 text-body text-placard/70">
+            The agent decides on its own. The contract decides whether that decision becomes a
+            payment. Run a scenario and watch the two disagree.
+          </p>
 
-          {agentUp === false && (
-            <p className="m-well mt-6 max-w-2xl px-4 py-3.5 text-body text-placard/70">
-              The agent service isn&apos;t answering at{" "}
-              <span className="font-mono text-placard">{AGENT_URL}</span>. Start it with{" "}
-              <span className="font-mono text-placard">uvicorn main:app --port 8000</span> in{" "}
-              <span className="font-mono text-placard">server/</span>. The trace below stays live
-              either way — it reads the chain, not the agent.
-            </p>
-          )}
-
-          <div className="mt-8 grid gap-4 lg:grid-cols-3">
-            {SCENARIOS.map((scenario) => (
-              <div key={scenario.id} className="m-panel flex flex-col px-5 py-5">
-                <div className="flex items-baseline gap-3">
-                  <span className="display text-lead leading-none text-placard/30">
-                    {scenario.letter}
-                  </span>
-                  <h2 className="heading text-body text-placard">{scenario.title}</h2>
-                </div>
-
-                <p className="mt-3 flex-1 text-body text-placard/65">{scenario.expect}</p>
-
-                <p className="font-mono text-legend text-placard/45">
-                  Expect <span className="text-hazard">{scenario.outcome}</span>
-                </p>
-
-                <button
-                  type="button"
-                  disabled={!agentUp || running !== null}
-                  onClick={() => void run(scenario)}
-                  className="legend mt-4 px-4 py-3 text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ backgroundColor: "var(--color-hazard)" }}
-                >
-                  {running === scenario.id ? "Running…" : "Run"}
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* --- Trace ---------------------------------------------------- */}
+          {/* --- Is it alive? ------------------------------------------- */}
           <section className="mt-10">
-            <div className="flex items-baseline justify-between gap-4 pb-3">
-              <h2 className="legend text-placard/70">Live trace</h2>
-              <span className="legend flex items-center gap-2 text-placard/45">
-                <span
-                  className={`led ${data.connected ? "led-running" : "led-off"}`}
-                  aria-hidden="true"
-                />
-                {data.connected ? "Listening" : "Offline"}
-              </span>
+            <h2 className="legend pb-3 text-placard/70">Agent</h2>
+            <AgentStatusStrip agent={agent} />
+          </section>
+
+          {/* --- Scenarios ---------------------------------------------- */}
+          <section className="mt-10">
+            <h2 className="legend pb-3 text-placard/70">Scenarios</h2>
+            <div className="grid gap-4 lg:grid-cols-3">
+              {SCENARIOS.map((scenario) => (
+                <div key={scenario.id} className="m-panel flex flex-col px-5 py-5">
+                  <div className="flex items-baseline gap-3">
+                    <span className="display text-lead leading-none text-placard/30">
+                      {scenario.letter}
+                    </span>
+                    <h3 className="heading text-body text-placard">{scenario.title}</h3>
+                  </div>
+
+                  <p className="mt-3 flex-1 text-body text-placard/65">{scenario.expect}</p>
+
+                  <p className="font-mono text-legend text-placard/45">
+                    Expect <span className="text-hazard">{scenario.outcome}</span>
+                  </p>
+
+                  <button
+                    type="button"
+                    disabled={offline || running !== null}
+                    onClick={() => void run(scenario)}
+                    className="legend mt-4 px-4 py-3 text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    style={{ backgroundColor: "var(--color-hazard)" }}
+                  >
+                    {running === scenario.id ? "Running…" : "Run"}
+                  </button>
+                </div>
+              ))}
             </div>
 
-            {trace.length > 0 && (
-              <ul className="m-well mb-3 flex flex-col gap-1.5 px-4 py-3.5" aria-live="polite">
-                {trace.map((line) => (
+            {log.length > 0 && (
+              <ul className="m-well mt-4 flex flex-col gap-1.5 px-4 py-3.5" aria-live="polite">
+                {log.map((line) => (
                   <li
                     key={line.id}
                     className="font-mono text-legend"
@@ -214,17 +198,28 @@ export function DemoStage() {
                 ))}
               </ul>
             )}
+          </section>
 
-            <Ticker
-              attempts={data.attempts}
-              limit={12}
-              emptyHint="Run a scenario, or start the agent, and payments appear here as the chain settles them."
-            />
+          {/* --- The argument ------------------------------------------- */}
+          <section className="mt-12">
+            <h2 className="legend text-placard/70">Decided, then ruled on</h2>
+            <p className="measure mb-4 mt-2 text-body text-placard/55">
+              What the agent intended, beside what the chain independently did about it.
+            </p>
+            <DecisionVerdictList decisions={data.decisions} attempts={data.attempts} limit={5} />
+          </section>
+
+          {/* --- Thinking out loud -------------------------------------- */}
+          <section className="mt-12">
+            <h2 className="legend pb-3 text-placard/70">Reasoning</h2>
+            <LiveTrace ticks={agent.ticks} decisions={data.decisions} online={agent.online} />
           </section>
         </div>
 
-        {/* --- The switch --------------------------------------------------- */}
-        <aside className="flex flex-col items-center gap-6 xl:sticky xl:top-10 xl:self-start">
+        {/* --- The switch, always in reach ------------------------------ */}
+        {/* `min-w-0`: a grid child defaults to `min-width: auto`, which refuses to shrink below
+            its content and pushes the whole row wider than the viewport on a phone. */}
+        <aside className="flex min-w-0 flex-col items-center gap-6 xl:sticky xl:top-8 xl:self-start">
           <div className="estop-mount">
             <Estop
               paused={paused}
@@ -256,7 +251,7 @@ export function DemoStage() {
             </div>
           )}
         </aside>
-      </div>
+      </Shell>
     </main>
   );
 }

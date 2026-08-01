@@ -18,21 +18,21 @@ export const metadata: Metadata = {
 export default function HowItWorksPage() {
   return (
     <main className="flex flex-1 flex-col">
-      <header className="border-b border-black/40 px-6 py-8 sm:px-10">
-        <div className="mx-auto max-w-4xl">
+      <header className="border-b border-black/40 px-6 py-8 sm:px-10 xl:px-16">
+        <div className="mx-auto max-w-384">
           <Link href="/" className="legend text-placard/60 transition-colors hover:text-placard">
             ← Kill Switch
           </Link>
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-4xl px-6 py-16 sm:px-10 lg:py-24">
+      <div className="mx-auto w-full max-w-384 px-6 py-16 sm:px-10 lg:py-24 xl:px-16">
         <Reveal>
           <p className="legend text-placard/55">Contract behaviour</p>
           <h1 className="display mt-3 text-panel text-placard sm:text-display sm:leading-[0.9]">
             How enforcement works
           </h1>
-          <p className="mt-6 max-w-xl text-lead text-placard/80">
+          <p className="measure mt-6 text-lead text-placard/80">
             Three things about <span className="font-mono text-placard">AgentWallet.sol</span> that
             are worth checking rather than believing.
           </p>
@@ -191,8 +191,8 @@ function Section({
   return (
     <section>
       <p className="legend text-placard/50">{eyebrow}</p>
-      <h2 className="heading mt-3 max-w-2xl text-panel text-placard">{title}</h2>
-      <div className="mt-5 flex max-w-2xl flex-col gap-4 text-body text-placard/70">{children}</div>
+      <h2 className="heading mt-3 max-w-[24ch] text-panel text-placard">{title}</h2>
+      <div className="measure mt-5 flex flex-col gap-4 text-body text-placard/70">{children}</div>
     </section>
   );
 }

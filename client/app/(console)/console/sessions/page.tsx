@@ -39,10 +39,10 @@ export default function SessionsPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-9">
+    <div className="mx-auto flex max-w-384 flex-col gap-9">
       <header>
         <h1 className="heading text-panel text-placard">Sessions</h1>
-        <p className="mt-2 max-w-xl text-body text-placard/65">
+        <p className="measure mt-2 text-body text-placard/65">
           The agent signs with a session key, never with the owner key. That is what makes the
           freeze meaningful — the process running the agent has no way to unfreeze itself.
         </p>

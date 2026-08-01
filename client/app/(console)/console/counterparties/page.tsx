@@ -68,10 +68,10 @@ export default function CounterpartiesPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-9">
+    <div className="mx-auto flex max-w-384 flex-col gap-9">
       <header>
         <h1 className="heading text-panel text-placard">Counterparties</h1>
-        <p className="mt-2 max-w-xl text-body text-placard/65">
+        <p className="measure mt-2 text-body text-placard/65">
           A payment to any address not listed here reverts with{" "}
           <span className="font-mono text-placard/85">CounterpartyNotAllowed</span>, whatever the
           agent believes it is doing.

@@ -65,7 +65,13 @@ export function ChecksExploded() {
   return (
     <ScrollStage
       id="checks"
-      end="+=200%"
+      // Not pinned, deliberately. Pinning makes a section `position: fixed`, which puts it in the
+      // same screen space as its neighbours and loses the paint-order fight with the orbit
+      // diagram's absolutely-positioned rings further down the page — the two sections render on
+      // top of each other. The scrub survives without the pin; only the hold is given up.
+      pin={false}
+      start="top 78%"
+      end="top 18%"
       className="border-t border-black/40"
       build={(tl, { q }) => {
         const rows = q("[data-plate]");
@@ -108,7 +114,7 @@ export function ChecksExploded() {
         }
       }}
     >
-      <div className="flex min-h-svh flex-col justify-center py-20 lg:py-24">
+      <div className="flex flex-col justify-center py-20 lg:py-28">
         <Shell>
           <p className="legend text-placard/55">Evaluated in this order, every time</p>
           <h2 className="heading mt-3 max-w-[22ch] text-panel text-placard">

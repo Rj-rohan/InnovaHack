@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DecisionVerdictList } from "@/components/agent/decision-verdict";
 import { useConsole } from "@/components/console-data";
 import { Ticker } from "@/components/ticker";
 import { BLOCK_REASONS } from "@/lib/policy";
@@ -38,10 +39,10 @@ export default function ActivityPage() {
   ).length;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8">
+    <div className="mx-auto flex max-w-384 flex-col gap-8">
       <header>
         <h1 className="heading text-panel text-placard">Activity</h1>
-        <p className="mt-2 max-w-xl text-body text-placard/65">
+        <p className="measure mt-2 text-body text-placard/65">
           Every payment the agent attempted, and what the contract did about it.{" "}
           {blockedCount > 0 && (
             <>
@@ -51,6 +52,18 @@ export default function ActivityPage() {
           )}
         </p>
       </header>
+
+      {/* The pairing goes above the flat feed: intent-beside-verdict is the reading that matters,
+          and the filtered list below is for looking something specific up. */}
+      {data.decisions.length > 0 && (
+        <section>
+          <h2 className="legend text-placard/70">Decided, then ruled on</h2>
+          <p className="measure mb-4 mt-2 text-body text-placard/55">
+            What the agent intended, beside what the chain independently did about it.
+          </p>
+          <DecisionVerdictList decisions={data.decisions} attempts={data.attempts} limit={4} />
+        </section>
+      )}
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by outcome">
         <Chip active={filter === "all"} onClick={() => setFilter("all")}>
@@ -79,7 +92,7 @@ export default function ActivityPage() {
       {/* --- Contract events ------------------------------------------------ */}
       <section>
         <h2 className="legend text-placard/70">Policy events</h2>
-        <p className="mt-2 max-w-xl text-body text-placard/60">
+        <p className="measure mt-2 text-body text-placard/60">
           Owner actions and contract-level notices, straight from the logs.
         </p>
 

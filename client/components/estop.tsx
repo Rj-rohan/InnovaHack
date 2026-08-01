@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FreezeStatus } from "@/lib/use-freeze";
+import { useWalletConnection } from "@/lib/use-wallet-connection";
 
 /**
  * The kill switch itself.
@@ -44,7 +45,20 @@ export function Estop({
   const keyHeldRef = useRef(false);
 
   const busy = status === "signing" || status === "pending";
-  const holdMs = paused ? RELEASE_HOLD_MS : FREEZE_HOLD_MS;
+
+  /**
+   * The face must always name what the hold actually does.
+   *
+   * While disconnected the hold opens a wallet, so the cap cannot say "Stop" — it did, and it
+   * meant the one control this product is about was labelled with an action it would not perform.
+   */
+  const mode: "connect" | "stop" | "release" = !connected
+    ? "connect"
+    : paused
+      ? "release"
+      : "stop";
+
+  const holdMs = mode === "release" ? RELEASE_HOLD_MS : FREEZE_HOLD_MS;
 
   // Disabled only while a transaction is in flight. A disconnected visitor still gets a working,
   // full-strength switch — holding it opens the wallet, which is the honest next step rather than
@@ -71,9 +85,11 @@ export function Estop({
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       setHolding(false);
-      void (paused ? onRelease() : onFreeze());
+      // Keyed off `mode`, not `paused`: while disconnected the hold connects, whatever the
+      // contract's pause flag happens to say.
+      void (mode === "release" ? onRelease() : onFreeze());
     }, holdMs);
-  }, [disabled, holdMs, paused, onFreeze, onRelease]);
+  }, [disabled, holdMs, mode, onFreeze, onRelease]);
 
   // Releasing the pointer outside the button still has to cancel: otherwise dragging off-target
   // leaves the switch armed and it fires anyway.
@@ -89,11 +105,12 @@ export function Estop({
 
   useEffect(() => clearTimer, [clearTimer]);
 
-  const action = connected
-    ? paused
-      ? "Release the agent"
-      : "Freeze the agent"
-    : "Connect the owner wallet to freeze the agent";
+  const action =
+    mode === "connect"
+      ? "Connect the owner wallet"
+      : mode === "release"
+        ? "Release the agent"
+        : "Freeze the agent";
 
   return (
     <button
@@ -103,8 +120,10 @@ export function Estop({
       data-paused={paused}
       data-holding={holding}
       data-busy={busy}
+      // Drives the unarmed look: the switch is present and full strength, but visibly not live yet.
+      data-armed={connected}
       disabled={disabled}
-      aria-pressed={paused}
+      aria-pressed={connected ? paused : undefined}
       aria-label={`${action}. Press and hold for ${holdMs / 1000} seconds.`}
       style={
         holding
@@ -132,7 +151,9 @@ export function Estop({
       <span className="estop-ring" aria-hidden="true" />
       <span className="estop-shoulder" aria-hidden="true">
         <span className="estop-cap">
-          <span className="estop-cap-text legend">{paused ? "Release" : "Stop"}</span>
+          <span className="estop-cap-text legend">
+            {mode === "connect" ? "Connect" : mode === "release" ? "Release" : "Stop"}
+          </span>
         </span>
       </span>
     </button>
@@ -158,6 +179,10 @@ export function EstopCaption({
   isOwner: boolean;
   error: string | null;
 }) {
+  // Read here rather than threaded through every call site: whether a wallet extension exists is
+  // global browser state, not something the four parents should each have to know about.
+  const { hasProvider } = useWalletConnection();
+
   // Checked before the connected/idle branches: a wallet that refused to open reports through
   // `error` while `status` is still "idle", and that message must not be swallowed.
   if (error) {
@@ -169,7 +194,11 @@ export function EstopCaption({
   }
 
   if (!connected) {
-    return <p className="legend text-placard/70">Hold to connect the owner wallet</p>;
+    return (
+      <p className="legend text-center text-placard/70">
+        {hasProvider === false ? "No wallet detected" : "Hold to connect the owner wallet"}
+      </p>
+    );
   }
 
   if (status === "signing") {

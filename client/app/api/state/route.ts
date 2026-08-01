@@ -24,6 +24,51 @@ export async function GET() {
     );
   }
 
+  // History is a nice-to-have; the contract addresses are not.
+  //
+  // An unreachable database used to fail this whole route, which left the browser with no wallet
+  // address — and therefore a kill switch that silently did nothing when held. The owner's ability
+  // to freeze must not depend on Mongo being up, so the deployment half is returned either way and
+  // only the recorded history degrades.
+  let history: {
+    state: Awaited<ReturnType<typeof loadHistory>>["state"];
+    attempts: unknown[];
+    events: unknown[];
+    decisions: unknown[];
+    run: unknown;
+    reviewItems: unknown[];
+  } | null = null;
+
+  try {
+    history = await loadHistory();
+  } catch {
+    history = null;
+  }
+
+  const state = history?.state ?? null;
+
+  return Response.json({
+    deployed: true,
+    chainId: deployment.chainId,
+    contracts: deployment.contracts,
+    owner: deployment.owner,
+    agentSessionKey: deployment.agentSessionKey,
+    counterparties: deployment.counterparties,
+    state,
+    attempts: history?.attempts ?? [],
+    events: history?.events ?? [],
+    decisions: history?.decisions ?? [],
+    run: history?.run ?? null,
+    reviewItems: history?.reviewItems ?? [],
+    /** False when the recorded history is unavailable — the UI says so rather than showing zeroes. */
+    historyAvailable: history !== null,
+    // Null until the indexer has written once — the UI should say "indexer not running" rather
+    // than silently showing stale-looking zeroes.
+    indexerHealthy: state != null && Date.now() - new Date(state.updatedAt).getTime() < 30_000,
+  });
+}
+
+async function loadHistory() {
   const c = await collections();
 
   const [state, attempts, events, decisions, run, reviewItems] = await Promise.all([
@@ -35,21 +80,5 @@ export async function GET() {
     c.reviewItems.find({}).sort({ createdAt: -1 }).limit(25).toArray(),
   ]);
 
-  return Response.json({
-    deployed: true,
-    chainId: deployment.chainId,
-    contracts: deployment.contracts,
-    owner: deployment.owner,
-    agentSessionKey: deployment.agentSessionKey,
-    counterparties: deployment.counterparties,
-    state,
-    attempts,
-    events,
-    decisions,
-    run,
-    reviewItems,
-    // Null until the indexer has written once — the UI should say "indexer not running" rather
-    // than silently showing stale-looking zeroes.
-    indexerHealthy: state != null && Date.now() - new Date(state.updatedAt).getTime() < 30_000,
-  });
+  return { state, attempts, events, decisions, run, reviewItems };
 }

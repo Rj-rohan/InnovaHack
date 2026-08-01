@@ -60,10 +60,10 @@ export default function PolicyPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-9">
+    <div className="mx-auto flex max-w-384 flex-col gap-9">
       <header>
         <h1 className="heading text-panel text-placard">Policy</h1>
-        <p className="mt-2 max-w-xl text-body text-placard/65">
+        <p className="measure mt-2 text-body text-placard/65">
           Caps are stored in the contract and re-read on every payment, including every leg of a
           batch. Changing them here takes effect on the agent&apos;s next attempt.
         </p>
@@ -80,7 +80,7 @@ export default function PolicyPage() {
       {/* --- Throttle ------------------------------------------------------ */}
       <section>
         <h2 className="legend text-placard/70">Throttle</h2>
-        <p className="mt-2 max-w-xl text-body text-placard/60">
+        <p className="measure mt-2 text-body text-placard/60">
           Scales both caps without losing their configured values — the middle setting between
           full access and a freeze.
         </p>
@@ -133,7 +133,7 @@ export default function PolicyPage() {
       {/* --- Caps ---------------------------------------------------------- */}
       <section>
         <h2 className="legend text-placard/70">Base caps</h2>
-        <p className="mt-2 max-w-xl text-body text-placard/60">
+        <p className="measure mt-2 text-body text-placard/60">
           The unthrottled values. The agent never sees these — it only ever meets the effective
           cap at execution time.
         </p>

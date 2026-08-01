@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { useFreeze, type FreezeControls } from "@/lib/use-freeze";
 import { useKillSwitch, type KillSwitchData } from "@/lib/use-kill-switch";
 import { useWalletConnection } from "@/lib/use-wallet-connection";
@@ -32,18 +32,35 @@ export function ConsoleDataProvider({ children }: { children: React.ReactNode })
   const wallet = useWalletConnection();
 
   const paused = freeze.paused ?? data.state?.paused ?? false;
+  const [controlError, setControlError] = useState<string | null>(null);
 
   const toggleFreeze = useCallback(() => {
+    setControlError(null);
+
     if (!freeze.connected) {
       wallet.openWallet();
       return;
     }
+
+    // `useFreeze` returns early with no address, which used to mean holding the switch did
+    // nothing and said nothing. Never let the kill switch fail quietly.
+    if (!data.contracts?.agentWallet) {
+      setControlError("No wallet under management — there is nothing to freeze yet.");
+      return;
+    }
+
     void (paused ? freeze.unfreeze() : freeze.freeze());
-  }, [freeze, paused, wallet]);
+  }, [freeze, paused, wallet, data.contracts?.agentWallet]);
 
   const value = useMemo(
-    () => ({ data, freeze, paused, toggleFreeze, connectError: wallet.error }),
-    [data, freeze, paused, toggleFreeze, wallet.error],
+    () => ({
+      data,
+      freeze,
+      paused,
+      toggleFreeze,
+      connectError: wallet.error ?? controlError,
+    }),
+    [data, freeze, paused, toggleFreeze, wallet.error, controlError],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

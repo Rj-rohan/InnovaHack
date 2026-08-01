@@ -76,36 +76,6 @@
   initial-value: 0%;
 }
 
-/* The inspection lamp. `--spot` is the radius of a hole punched through the cover, so it has to
-   be a registered property for GSAP to interpolate it.
-
-   Initial value is wide open: with no JS, reduced motion, or a deep link landing mid-section, the
-   cover is fully transparent and the content beneath simply reads. The animation closes it to 0%
-   and sweeps back out. */
-@property --spot {
-  syntax: "<percentage>";
-  inherits: false;
-  initial-value: 150%;
-}
-
-.spotlight-cover {
-  --spot-x: 68%;
-  --spot-y: 52%;
-  background-color: #141817;
-  -webkit-mask-image: radial-gradient(
-    circle at var(--spot-x) var(--spot-y),
-    transparent var(--spot),
-    #000 calc(var(--spot) + 4%)
-  );
-  mask-image: radial-gradient(
-    circle at var(--spot-x) var(--spot-y),
-    transparent var(--spot),
-    #000 calc(var(--spot) + 4%)
-  );
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-}
-
 /* ===========================================================================
    Base
    =========================================================================== */
@@ -307,6 +277,17 @@ html {
    promise. Holding it while disconnected opens the wallet instead. */
 .estop:disabled {
   cursor: wait;
+}
+
+/* Unarmed: no wallet connected yet. The collar loses its colour and the cap sits a little softer,
+   so the switch reads as not-yet-live rather than as broken. The cap stays fully opaque — an
+   earlier version dropped the whole control to 55% and looked like a rendering fault. */
+.estop[data-armed="false"] .estop-ring {
+  filter: saturate(0.35);
+}
+
+.estop[data-armed="false"] .estop-cap {
+  background: radial-gradient(circle at 50% 22%, #b8574f 0%, #9c4038 45%, #73302a 100%);
 }
 
 /* The switch is bolted to something. Without a mount it floats on the photograph and stops

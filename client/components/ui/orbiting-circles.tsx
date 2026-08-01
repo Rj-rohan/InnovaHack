@@ -23,7 +23,7 @@ type OrbitIcon = { label: string; angle: number; glyph: React.ReactNode };
 const ORBITS: { size: string; duration: number; icons: OrbitIcon[] }[] = [
   {
     // Inner: what enforcement is written in.
-    size: "h-[17rem] w-[17rem] md:h-[19rem] md:w-[19rem]",
+    size: "h-56 w-56 md:h-64 md:w-64",
     duration: 64,
     icons: [
       { label: "Solidity", angle: -60, glyph: <SolidityMark /> },
@@ -33,7 +33,7 @@ const ORBITS: { size: string; duration: number; icons: OrbitIcon[] }[] = [
   },
   {
     // Middle: what the owner sees.
-    size: "h-[25rem] w-[25rem] md:h-[27rem] md:w-[27rem]",
+    size: "h-80 w-80 md:h-96 md:w-96",
     duration: 82,
     icons: [
       { label: "Next.js", angle: 0, glyph: <NextMark /> },
@@ -43,7 +43,7 @@ const ORBITS: { size: string; duration: number; icons: OrbitIcon[] }[] = [
   },
   {
     // Outer: what the agent runs on.
-    size: "h-[33rem] w-[33rem] md:h-[35rem] md:w-[35rem]",
+    size: "h-104 w-104 md:h-128 md:w-128",
     duration: 104,
     icons: [
       { label: "Python", angle: -45, glyph: <PythonMark /> },
@@ -55,10 +55,14 @@ const ORBITS: { size: string; duration: number; icons: OrbitIcon[] }[] = [
 export function OrbitingStack() {
   return (
     <div
-      className="orbit-stage relative mx-auto h-88 w-full max-w-148 scale-[0.62] sm:scale-75 md:h-152 md:scale-100"
+      // Sized to sit in a column beside the copy rather than as a full-width band. The outer ring
+      // is 32rem, so the stage is 34rem — just enough clearance for the chip labels.
+      className="orbit-stage relative mx-auto h-108 w-full max-w-136 scale-90 sm:scale-100 md:h-136"
       aria-hidden="true"
     >
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 aspect-square w-40 -translate-x-1/2 -translate-y-1/2 md:w-52">
+      {/* Kept clear of the inner ring's chip labels — at w-40 the SOLIDITY and ETHEREUM captions
+          ran over the sphere's edge. */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 aspect-square w-24 -translate-x-1/2 -translate-y-1/2 md:w-32">
         <ParticleSphere className="h-full w-full" />
       </div>
 

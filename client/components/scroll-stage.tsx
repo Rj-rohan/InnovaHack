@@ -27,7 +27,10 @@ export interface StageContext {
 export function ScrollStage({
   children,
   build,
-  pin = true,
+  // Defaults off. Pinning makes a section `position: fixed`, which shares screen space with its
+  // neighbours and fights them for paint order — it rendered two sections on top of each other
+  // here. Opt in only with an opaque stage and nothing absolutely-positioned nearby.
+  pin = false,
   scrub = 1,
   start = "top top",
   end = "+=180%",
@@ -38,6 +41,7 @@ export function ScrollStage({
   children: React.ReactNode;
   /** Compose the timeline. Called only when motion is allowed. */
   build: (tl: gsap.core.Timeline, ctx: StageContext) => void;
+  /** Off by default — see the note on the parameter. */
   pin?: boolean;
   scrub?: number | boolean;
   start?: string;
@@ -90,7 +94,14 @@ export function ScrollStage({
   );
 
   return (
-    <div ref={root} id={id} className={className}>
+    <div
+      ref={root}
+      id={id}
+      // A pinned stage becomes `position: fixed`, so a transparent one lets the following section
+      // scroll straight through it. Defaulted opaque here rather than left to each caller to
+      // remember — `className` still wins if a stage wants a different surface.
+      className={`${pin ? "bg-enamel" : ""} ${className}`}
+    >
       {children}
     </div>
   );

@@ -24,6 +24,7 @@ const SECTIONS = [
   { href: "/console/policy", label: "Policy" },
   { href: "/console/counterparties", label: "Counterparties" },
   { href: "/console/sessions", label: "Sessions" },
+  { href: "/console/review", label: "Review" },
   { href: "/console/activity", label: "Activity" },
 ] as const;
 
@@ -61,6 +62,13 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
         : data.attempts.length > 0
           ? "running"
           : "off",
+    // Amber only while something is actually waiting on the owner — a lamp that is always lit
+    // stops being a signal.
+    "/console/review": data.reviewItems.some((item) => item.status === "pending")
+      ? "caution"
+      : data.reviewItems.length > 0
+        ? "running"
+        : "off",
   };
 
   return (
@@ -102,7 +110,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* --- Top strip. The freeze is here on every route. --- */}
-        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-black/45 bg-enamel px-5 py-3 lg:top-0">
+        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-black/45 bg-enamel px-5 py-3 pr-6 lg:top-0 lg:pr-8">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
             <span className="legend text-placard/75">Sepolia</span>
             {state && (
@@ -125,8 +133,14 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-4">
             <ConnectButton />
             <div className="flex items-center gap-2.5">
+              {/* Must agree with the cap face. Saying "Hold to freeze" beside a switch that will
+                  open a wallet is the same defect as labelling the cap "Stop" when disconnected. */}
               <span className="legend hidden text-placard/60 sm:inline">
-                {paused ? "Hold to release" : "Hold to freeze"}
+                {!freeze.connected
+                  ? "Hold to connect"
+                  : paused
+                    ? "Hold to release"
+                    : "Hold to freeze"}
               </span>
               <Estop
                 variant="bar"

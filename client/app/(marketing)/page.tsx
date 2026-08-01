@@ -8,7 +8,7 @@ import { ScrollRefresh } from "@/components/scroll-stage";
 import { ChecksExploded } from "@/components/sections/checks-exploded";
 import { PaymentsRail } from "@/components/sections/payments-rail";
 import { ReceiptExpansion } from "@/components/sections/receipt-expansion";
-import { SpotlightContrast } from "@/components/sections/spotlight-contrast";
+import { StorageContrast } from "@/components/sections/storage-contrast";
 import { OrbitingStack } from "@/components/ui/orbiting-circles";
 
 export const metadata: Metadata = {
@@ -45,30 +45,37 @@ export default function LandingPage() {
 
       <ChecksExploded />
 
-      {/* --- T4 rest. The orbit has its own slow rotation; nothing is coupled to scroll. --- */}
-      <section className="overflow-hidden border-t border-black/40 bg-enamel-lo pt-20 lg:pt-28">
+      {/* --- T4 rest. The orbit has its own slow rotation; nothing is coupled to scroll.
+              Text and diagram sit side by side: stacked, the copy left a large void to its right
+              and the section ran to nearly two screens for four sentences. --- */}
+      <section className="overflow-hidden border-t border-black/40 bg-enamel-lo py-20 lg:py-28">
         <Shell>
-          <Reveal>
-            <p className="legend text-placard/55">Built on</p>
-            <h2 className="heading mt-3 max-w-[24ch] text-panel text-placard">
-              Four moving parts, one of which cannot be argued with
-            </h2>
-            <p className="measure mt-4 text-body text-placard/65">
-              The policy is Solidity on Ethereum, tested and deployed with Hardhat. The console is
-              Next.js and React, reading chain state through viem. The agent is Python, and its
-              decision trace lands in MongoDB. Only the first of those can stop a payment.
-            </p>
-          </Reveal>
-        </Shell>
+          <div className="grid items-center gap-x-16 gap-y-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+            <Reveal>
+              <p className="legend text-placard/55">Built on</p>
+              <h2 className="heading mt-3 max-w-[20ch] text-panel text-placard">
+                Four moving parts, one of which cannot be argued with
+              </h2>
+              <p className="measure mt-5 text-body text-placard/65">
+                The policy is Solidity on Ethereum, tested and deployed with Hardhat. The console is
+                Next.js and React, reading chain state through viem. The agent is Python, and its
+                decision trace lands in MongoDB.
+              </p>
+              <p className="mt-4 max-w-md text-body text-placard">
+                Only the first of those can stop a payment.
+              </p>
+            </Reveal>
 
-        <Reveal className="mt-4">
-          <OrbitingStack />
-        </Reveal>
+            <Reveal delay={80}>
+              <OrbitingStack />
+            </Reveal>
+          </div>
+        </Shell>
       </section>
 
       <ReceiptExpansion />
 
-      <SpotlightContrast />
+      <StorageContrast />
 
       {/* --- T4 rest. --- */}
       <section className="border-t border-black/40 py-20 lg:py-28">

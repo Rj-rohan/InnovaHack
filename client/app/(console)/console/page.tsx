@@ -21,10 +21,10 @@ export default function ConsoleOverview() {
   const status = paused ? "Frozen" : throttled ? "Throttled" : "Running";
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-10">
+    <div className="mx-auto flex max-w-384 flex-col gap-10">
       <header>
         <h1 className="heading text-panel text-placard">Overview</h1>
-        <p className="mt-2 max-w-xl text-body text-placard/65">
+        <p className="measure mt-2 text-body text-placard/65">
           Every figure here is contract storage, read back. Nothing on this page is what the agent
           reported about itself.
         </p>
