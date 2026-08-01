@@ -1,46 +1,131 @@
-THE KILL SWITCH - FEATURE PLAN
-Problem Statement 2 (Fintech Domain)
+THE KILL SWITCH
+Problem Statement — Fintech
 
-CORE IDEA
-Build a smart contract wallet that sits between the AI agent and real money. The agent never holds keys directly - it only gets permission to trigger actions inside limits we set on-chain. If the agent misbehaves, gets hacked, or just goes rogue, the contract itself refuses the transaction, and the owner can freeze everything instantly, even mid-transaction.
+================================================================================
+BACKGROUND
+================================================================================
 
-1. POLICY-ENFORCED SMART WALLET (Core Requirement 1)
-- Deploy a smart contract wallet (using ERC-4337 account abstraction or a Safe/Gnosis Safe with a custom module) that the agent interacts with instead of a raw EOA.
-- Spend limits (per-transaction cap, daily cap, rolling 24hr cap) are written into the contract, not into the agent's prompt or code.
-- Every transaction request from the agent gets checked against these limits on-chain before it executes. If it fails the check, the transaction reverts - no exceptions, no "the agent forgot to check."
-- This proves enforcement doesn't depend on the agent cooperating - even a compromised or adversarial agent physically cannot move funds outside the policy.
+Autonomous agents are increasingly given wallets and allowed to transact without
+a human approving each individual move. This unlocks speed and autonomy — but it
+also means a compromised, buggy, or simply overzealous agent can spend money
+faster than any human can react.
 
-2. ALLOWLISTED COUNTERPARTIES (Core Requirement 2)
-- Maintain an on-chain allowlist (simple mapping of approved addresses) that only the owner can update.
-- Any transaction to an address not on the list is blocked at the contract level, regardless of what the agent "thinks" it's doing.
-- Bonus: allow categories/tags for counterparties (e.g. "vendor", "gas refill", "exchange") so the owner can approve groups instead of one address at a time.
+================================================================================
+THE PAIN POINT
+================================================================================
 
-3. OWNER KILL SWITCH (Core Requirement 3)
-- A single `pause()` function callable only by the owner (or a small multisig for extra safety) that immediately halts all agent transactions.
-- Works as a circuit breaker pattern - once paused, every function the agent can call checks a `paused` flag first and reverts if true.
-- Include an `unpause()` so the owner can resume once they've reviewed what happened.
-- Optional: a "throttle" mode between full-stop and full-access, where the owner can drop the agent's limits to near-zero without fully freezing it (useful if we want partial ops to continue).
+Once an agent holds a wallet, "asking it nicely" to behave isn't a control — it's
+a hope. There's no reliable way today to cap what an agent can spend, restrict who
+it can pay, or stop it mid-transaction if something goes wrong, because most
+controls live in the agent's own logic rather than being enforced independently
+of it.
 
-4. IN-FLIGHT REVOCATION (Bonus)
-- Use session keys (ERC-7715 style or a custom signer-revocation mapping) so the agent's permission to act can be pulled mid-flow, even if a multi-step transaction is already underway.
-- For multi-step / multi-call transactions, check the pause flag and allowlist status before EVERY sub-call, not just at the start - so revoking access stops execution between steps, not just before the first one.
-- This is the hardest part to demo well, so we should build this early and test it doesn't just "block new transactions" but actually kills something already running.
+================================================================================
+CORE REQUIREMENTS
+================================================================================
 
-5. UNSUPERVISED AGENT DEMO (Core Requirement 4)
-- Build a simple AI agent (LangChain/basic LLM agent loop is enough) that runs on its own and periodically decides to send payments.
-- Script three demo scenarios live:
-  a. Normal operation - agent sends a small approved payment to an allowlisted address, succeeds.
-  b. Attack attempt - agent (simulating a bug/prompt injection) tries to send to a non-allowlisted address or exceed its spend cap - contract reverts, agent's transaction fails on-chain, not because the agent "decided not to."
-  c. Owner freeze mid-execution - while the agent is mid-loop attempting a legitimate-looking transaction, owner hits pause from a dashboard/CLI, and the in-flight action gets blocked instantly.
-- Show contract-level logs/events (SpendLimitExceeded, CounterpartyNotAllowed, AgentPaused) so judges can see enforcement happening outside the agent, not inside its reasoning.
+1. Spend limits enforced at the wallet or contract layer — not inside the agent's
+   own logic.
 
-6. OWNER DASHBOARD (Nice-to-have, helps demo)
-- Small frontend (React) showing: current spend limits, allowlist, live transaction attempts (approved/blocked), and one big red "FREEZE AGENT" button.
-- Makes the live demo much more convincing to judges than reading contract calls off a terminal.
+2. Allowlisted counterparties, so the agent can only transact with pre-approved
+   parties.
 
-TECH STACK (proposed)
-- Solidity smart contract wallet (Safe + custom Zodiac-style module, or a minimal custom contract if time is short)
-- Hardhat/Foundry for local testing and deployment to a testnet (Sepolia)
-- Simple agent loop in Python/JS calling the wallet through a library (ethers.js/web3.py)
-- React dashboard + ethers.js for the freeze button and live status
+3. An owner-controlled mechanism to freeze the agent mid-execution, at any point.
 
+4. A demo showing the agent running unsupervised, attempting to exceed its policy,
+   and being blocked.
+
+================================================================================
+EVALUATION METRICS
+================================================================================
+
+Enforcement layer
+    Whether controls are genuinely enforced at the wallet/contract level,
+    independent of the agent's cooperation.
+
+Kill-switch reliability
+    How immediately and reliably the owner can freeze or revoke the agent.
+
+Attack resistance
+    How well the system holds up when the agent actively tries to exceed its
+    limits.
+
+In-flight revocation (bonus)
+    Whether access can be revoked while a transaction is already in progress.
+
+Real-world plausibility
+    Whether the guardrails would hold up with a real wallet and real funds, not
+    just in a controlled demo.
+
+
+================================================================================
+HOW THIS BUILD ANSWERS EACH REQUIREMENT
+================================================================================
+
+Requirement 1 — spend limits at the contract layer
+    AgentWallet.sol holds a per-transaction cap and a rolling 24-hour cap in
+    contract storage, checked inside pay() before any transfer. The rolling cap
+    is a real trailing window (a 32-slot ring buffer), not a calendar day that
+    resets at midnight and lets an agent spend two full allowances an hour apart.
+    The agent's own code performs ZERO validation — server/chain/client.py
+    send_payment() signs and broadcasts whatever the model asked for, and says so
+    in a comment. The verification tools the agent has (purchase-order matching,
+    duplicate detection, vendor history) are advisory: it can call all of them,
+    ignore every answer, and still broadcast.
+
+Requirement 2 — allowlisted counterparties
+    An on-chain mapping of address to category tag, owner-writable only. Any
+    payment to an unregistered address reverts with CounterpartyNotAllowed.
+    Categories let the owner disable a whole group ("vendor", "gas") in one
+    transaction rather than address by address.
+
+Requirement 3 — owner freeze, mid-execution
+    pause() is owner-only and re-checked before every payment leg. It is
+    deliberately NOT nonReentrant, so it still works when called from inside a
+    payment run already underway. A throttle setting gives a middle position
+    between running and frozen. ownerWithdraw() bypasses the freeze, so a paused
+    wallet never locks the owner out of their own funds. The owner signs from
+    their own wallet, so the machine running the agent provably cannot unfreeze
+    itself — and the service refuses to start if the agent's session key equals
+    the owner address.
+
+Requirement 4 — unsupervised agent, attempting to exceed policy, blocked
+    A FastAPI agent runs on a timer, reviewing an invoice queue and deciding for
+    itself what to pay, hold, or ignore. Three demo scenarios:
+      A  normal operation — verifies a purchase order and pays within the caps
+      B  the agent is compromised — subverted instructions plus a poisoned
+         invoice; it decides to pay an attacker and the chain refuses
+      C  freeze mid-flight — a multi-leg run halted partway through by the owner
+
+    Scenario B has a second form with the model removed entirely (a ~30-line
+    script that signs directly). The contract cannot tell whether a transaction
+    came from a careful model, a subverted one, a rogue script, or an attacker
+    holding a leaked session key. It refuses all four identically, because it
+    never asks.
+
+Bonus — in-flight revocation
+    payBatch() re-validates pause state, session validity, the allowlist and both
+    caps before EVERY leg. Proven by test_BatchHaltsMidFlightWhenPausedBetweenLegs,
+    which uses a re-entrant token to pull the kill switch between legs of a single
+    transaction — something no live chain can demonstrate.
+
+Real-world plausibility
+    The agent holds a revocable session key that can only propose payments; it
+    cannot pause, unpause, change limits, edit the allowlist, or withdraw. The
+    owner key is absent from the agent process entirely. The demo runs on a local
+    chain for speed and reliability, but the same bytecode deploys to a public
+    testnet by changing two environment variables — no code changes.
+
+    Nothing in the demo is a fixture: vendors, purchase orders, invoice numbers,
+    amounts and memo text are generated by an LLM at the start of each run. Run it
+    twice and the book of business is different both times.
+
+================================================================================
+WHAT IS DELIBERATELY NOT A CONTROL
+================================================================================
+
+The agent can hold a suspicious invoice for human review. That is good product
+behaviour and it is NOT the safety mechanism — a compromised agent simply would
+not use it. If a reviewer comes away believing the agent's own caution is what
+protects the money, the demonstration has failed. The contract is the control;
+scenario B exists to make that unmistakable.

@@ -61,7 +61,7 @@ Get both free API keys — [Gemini](https://aistudio.google.com/apikey),
 `client/.env.local`. On the local chain you need nothing else: no faucet, no private key, no
 MetaMask to run it.
 
-> **Upgrading an older `.env`?** Replace `SEPOLIA_RPC_URL` with `RPC_URL=http://127.0.0.1:8545`
+> **Upgrading an older `.env`?** Replace `SEPOLIA_RPC_URL` with `RPC_URL=http://127.0.0.1:8550`
 > and set `CHAIN_ID=31337`. Leaving `CHAIN_ID=11155111` makes the service look for a Sepolia
 > deployment that does not exist.
 
@@ -72,7 +72,7 @@ MetaMask to run it.
 Four terminals:
 
 ```sh
-cd contracts && npx hardhat node          # local chain            :8545
+cd contracts && npm run node              # local chain (port from RPC_URL)
 cd contracts && npm run deploy:local      # deploy + seed (re-run after any node restart)
 cd client   && npm run dev                # dashboard              :3000
 cd client   && npm run indexer            # chain indexer
@@ -104,20 +104,36 @@ run before paying anything:
 | `hold_for_review` | Refer it to a human, pay nothing |
 | `get_wallet_state` | Balance, caps, spend so far, frozen or not |
 
-The scripted invoice sequence produces genuinely different outcomes, and **two of the five end in
-the agent not paying**:
+**The invoice queue is generated, not scripted.** At the start of each run an LLM invents the
+vendors, purchase orders, invoice numbers, amounts and memo text. Run the demo twice and it is a
+different book of business — verify that yourself with:
 
-1. `INV-2041` clean, matches PO-8841 → paid
-2. `INV-2042` clean, matches PO-8842 → paid
-3. `INV-2044` duplicate of 2041 → detected, not paid
-4. `INV-2045` ~10× the vendor's average, no PO → **held for review**
-5. `INV-2046` vendor never seen, not allowlisted → held; if paid anyway, the contract refuses
+```sh
+cd server && ./.venv/Scripts/python.exe verify_generated.py
+```
 
-Held invoices appear in the console. Approve one and the agent settles it on its next cycle:
+What *is* guaranteed is the **shape**: the generator is asked for a batch containing one invoice of
+each category, without being told any of the values. So every run produces the same four decisions
+over completely different data, and **two of the four end in the agent not paying**:
+
+| Category | Expected outcome |
+|---|---|
+| clean — matches an open PO, under the caps | paid |
+| duplicate — a re-send of the clean one | detected, not paid |
+| anomalous — ~10× the vendor's average, no PO | **held for review** |
+| unknown vendor — not on the allowlist | held; if paid anyway, the contract refuses |
+
+Two details the generator gets told, because they decide whether the demo shows anything: the clean
+and unknown-vendor invoices must sit **below** the per-transaction cap. An over-cap clean invoice can
+never succeed, and an over-cap unknown-vendor invoice gets refused for the amount rather than the
+allowlist — proving the wrong control. Both are rejected and regenerated.
+
+Held invoices appear in the console. Approve one and the agent settles it on its next cycle
+(invoice IDs differ every run — read the current one from the queue):
 
 ```sh
 curl localhost:8000/agent/review
-curl -X POST localhost:8000/agent/review/INV-2045/approve
+curl -X POST localhost:8000/agent/review/<INVOICE_ID>/approve
 ```
 
 > **Be precise about this in the demo.** The review queue is a **soft** control — it is the agent
@@ -144,9 +160,9 @@ curl -X POST localhost:8000/demo/scenario/b
 ```
 
 The agent's instructions have been subverted *and* the invoice memo carries an injected
-"our banking details changed, remit to `0xBAD…`" payload. It pays. The transaction is broadcast,
+"our banking details changed" payload naming a freshly generated attacker address. It pays. The transaction is broadcast,
 mined, and **reverts** — the indexer replays it and the row reads
-`blocked — CounterpartyNotAllowed(0xBAD…)`.
+`blocked — CounterpartyNotAllowed(0x…)`.
 
 **On why the prompt is subverted rather than relying on tricking the model:** an earlier version
 depended on the memo alone and the model sometimes saw through it, which made the demo a coin flip.
@@ -205,8 +221,8 @@ service is deployed with it present.
 | Bring-up | `deploy:local` writes `deployments/31337.json` with no env vars and no faucet |
 | Indexes | restart the indexer twice → **zero** duplicate `policy_events` |
 | Live push | a payment lands on the dashboard without a refresh |
-| Agent holds | `INV-2045` ends `held`, `payments=0`, with a human-readable reason |
-| Approval | approve `INV-2045` → paid on the next tick |
+| Agent holds | the anomalous invoice ends `held`, `payments=0`, with a human-readable reason |
+| Approval | approve the held invoice → settled on the next tick |
 | Enforcement | scenario B → transaction **reverted**, attacker balance still zero |
 | Rolling window | cap → refused → advance 25h → succeeds |
 | Time-travel guard | returns 400 when `CHAIN_ID != 31337` |

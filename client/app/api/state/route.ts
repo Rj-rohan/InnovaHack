@@ -16,7 +16,9 @@ export async function GET() {
     return Response.json(
       {
         deployed: false,
-        message: "No deployment record found. Run: cd contracts && npm run deploy:sepolia",
+        // Neutral wording: this payload reaches the browser, so it must not read as a build
+        // instruction. Operator guidance lives in SETUP.md.
+        message: "No wallet is under management on the configured network.",
       },
       { status: 503 },
     );

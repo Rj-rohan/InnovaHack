@@ -1,5 +1,13 @@
+// Must be first. Hardhat's `configVariable()` resolves from `process.env` (or a keystore) and does
+// NOT read `.env` on its own — without this, every value in contracts/.env is invisible and
+// `deploy:sepolia` fails with "Configuration Variable not found" while the file sits right there.
+import "dotenv/config";
+
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
+
+// Single definition, shared with scripts/node.mjs — see rpc.mjs.
+import { localRpcUrl } from "./rpc.mjs";
 
 export default defineConfig({
   plugins: [hardhatToolboxViemPlugin],
@@ -34,7 +42,7 @@ export default defineConfig({
     localhost: {
       type: "http",
       chainType: "l1",
-      url: "http://127.0.0.1:8545",
+      url: localRpcUrl(),
     },
     // Kept in place so promotion to a public network is a deploy, not a rewrite.
     sepolia: {

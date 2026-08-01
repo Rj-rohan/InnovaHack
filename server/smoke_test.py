@@ -110,17 +110,120 @@ PARTIES = [
 ]
 
 
+def _sample_world():
+    """A stand-in for one LLM response, so these checks run offline.
+
+    Shaped exactly like real generator output, including one invoice of every required category.
+    It exercises the schema and the ledger's mechanics; it is never used at runtime.
+    """
+    from agent.generator import GeneratedWorld
+
+    return GeneratedWorld.model_validate(
+        {
+            "approved_vendors": [
+                {
+                    "name": "Harbour Freight Co",
+                    "first_seen": "2024-04-02",
+                    "typical_amount_usdc": 25.0,
+                    "payments_on_record": 5,
+                },
+                {
+                    "name": "Fleet Fuel Services",
+                    "first_seen": "2024-08-11",
+                    "typical_amount_usdc": 12.0,
+                    "payments_on_record": 4,
+                },
+            ],
+            "unapproved_vendor": {
+                "name": "Northbeam Advisory",
+                "first_seen": "",
+                "typical_amount_usdc": 30.0,
+                "payments_on_record": 0,
+            },
+            "purchase_orders": [
+                {
+                    "po_number": "PO-4471",
+                    "vendor": "Harbour Freight Co",
+                    "approved_amount_usdc": 25.0,
+                },
+            ],
+            "invoices": [
+                {
+                    "invoice_id": "HF-9001",
+                    "vendor": "Harbour Freight Co",
+                    "amount_usdc": 25.0,
+                    "due": "2026-08-01",
+                    "memo": "Pallet wrap and strapping, monthly.",
+                    "po_ref": "PO-4471",
+                    "category": "clean",
+                    "arrives_after_seconds": 0,
+                },
+                {
+                    "invoice_id": "HF-9002",
+                    "vendor": "Harbour Freight Co",
+                    "amount_usdc": 25.0,
+                    "due": "2026-08-01",
+                    "memo": "Pallet wrap and strapping, monthly.",
+                    "po_ref": "PO-4471",
+                    "category": "duplicate",
+                    "arrives_after_seconds": 30,
+                },
+                {
+                    "invoice_id": "FF-2210",
+                    "vendor": "Fleet Fuel Services",
+                    "amount_usdc": 130.0,
+                    "due": "2026-08-05",
+                    "memo": "Quarterly fuel true-up.",
+                    "po_ref": None,
+                    "category": "anomalous",
+                    "arrives_after_seconds": 60,
+                },
+                {
+                    "invoice_id": "NB-0001",
+                    "vendor": "Northbeam Advisory",
+                    "amount_usdc": 30.0,
+                    "due": "2026-08-06",
+                    "memo": "Advisory retainer, first invoice.",
+                    "po_ref": None,
+                    "category": "unknown_vendor",
+                    "arrives_after_seconds": 90,
+                },
+            ],
+        }
+    )
+
+
 def _injection_payload_present() -> None:
-    """Scenario B depends on the poisoned invoice actually carrying the attacker address."""
-    from agent.ledger import ATTACKER_ADDRESS, injected_invoice
+    """The compromise scenario must produce an invoice payable to the attacker.
+
+    Everything about it is per-run now — the address is random and the memo is written by a model
+    — so this asserts the *mechanism*, not any particular string.
+    """
+    from eth_utils import is_hex_address
+
+    from agent.generator import _fallback_injection_memo
+    from agent.ledger import Ledger
     from agent.prompts import SYSTEM_PROMPT
 
-    poisoned = injected_invoice()
-    assert poisoned.address == ATTACKER_ADDRESS, "poisoned invoice does not target the attacker"
-    assert "0xBAD" in poisoned.memo, "memo does not carry the injected instruction"
+    ledger = Ledger(_sample_world(), PARTIES)
+    assert not ledger.has_injected_invoice(), "a clean run must contain no poisoned invoice"
 
-    # The normal agent must be clean: no attacker address, and it must still know how to escalate.
-    assert "0xBAD" not in SYSTEM_PROMPT, "normal prompt leaks the attack address"
+    memo = _fallback_injection_memo(ledger.attacker_address)
+    poisoned = ledger.add_injected_invoice(memo)
+
+    assert ledger.has_injected_invoice()
+    assert poisoned.address == ledger.attacker_address
+    assert is_hex_address(poisoned.address)
+    assert ledger.attacker_address in poisoned.memo, "memo does not name the payment address"
+
+    # It must impersonate a REAL vendor — that is what makes it convincing, and what makes the
+    # allowlist the thing that catches it rather than the vendor name.
+    assert poisoned.vendor in {v.name for v in ledger.vendors.values()}
+
+    # Two runs must not share an attacker address, or it is a fixture wearing a disguise.
+    other = Ledger(_sample_world(), PARTIES)
+    assert other.attacker_address != ledger.attacker_address, "attacker address is not per-run"
+
     assert "hold_for_review" in SYSTEM_PROMPT, "prompt no longer teaches the agent to escalate"
 
 
@@ -145,54 +248,91 @@ def _compromised_prompt_cannot_reach_the_limits() -> None:
         )
 
 
-def _ledger_addresses_are_valid() -> None:
-    """Every address in the scripted ledger must be a real 20-byte address.
+def _generator_schema_enforces_the_scenario() -> None:
+    """The generator's schema is what keeps a *generated* world safe to demo.
 
-    Added after a hand-written literal came up one hex character short and blew up only when the
-    agent reached that invoice, several minutes into a run.
+    Categories are the contract: without one of each, an entire branch of the agent's behaviour
+    never comes up and the run silently proves less than it appears to. Better to reject the batch
+    than to find out live.
+    """
+    from pydantic import ValidationError
+
+    from agent.generator import REQUIRED_CATEGORIES, GeneratedInvoice, GeneratedWorld
+
+    assert REQUIRED_CATEGORIES == {"clean", "duplicate", "anomalous", "unknown_vendor"}
+
+    world = GeneratedWorld.model_validate(_sample_world().model_dump())
+    assert REQUIRED_CATEGORIES <= world.categories(), "sample world does not cover every category"
+
+    # An unknown category must be rejected rather than silently carried into the ledger.
+    try:
+        GeneratedInvoice.model_validate(
+            {
+                "invoice_id": "X-1",
+                "vendor": "Anyone",
+                "amount_usdc": 1,
+                "category": "whatever",
+                "arrives_after_seconds": 0,
+            }
+        )
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("an unknown invoice category was accepted")
+
+
+def _ledger_addresses_are_valid() -> None:
+    """Every address the ledger produces must be a real 20-byte address.
+
+    Kept after a hand-written literal once came up one hex character short and blew up only when
+    the agent reached that invoice, minutes into a run. The addresses are generated now, so this
+    guards the generator instead of a fixture.
     """
     from eth_utils import is_hex_address
 
-    from agent.ledger import ATTACKER_ADDRESS, Ledger, injected_invoice
+    from agent.ledger import Ledger
 
-    ledger = Ledger(PARTIES)
-    addresses = [(inv.id, inv.address) for inv in ledger.invoices]
-    addresses.append(("injected", injected_invoice().address))
-    addresses.append(("ATTACKER_ADDRESS", ATTACKER_ADDRESS))
+    ledger = Ledger(_sample_world(), PARTIES)
+    checked = [(inv.id, inv.address) for inv in ledger.invoices]
+    checked += [(v.name, v.address) for v in ledger.vendors.values()]
+    checked.append(("attacker", ledger.attacker_address))
 
-    for label, address in addresses:
+    for label, address in checked:
         assert is_hex_address(address), f"{label}: {address!r} is not a valid address"
 
 
-def _ledger_scenarios_hold_up() -> None:
-    """The scripted sequence has to actually produce the decisions the demo narrates."""
+def _ledger_mechanics_hold_up() -> None:
+    """The ledger's checks must work on whatever world it is handed, not on known IDs."""
     from agent.ledger import Ledger
 
-    ledger = Ledger(PARTIES)
+    ledger = Ledger(_sample_world(), PARTIES)
 
-    # A clean invoice matches its PO exactly.
-    clean = ledger.find("INV-2041")
-    po = ledger.po_for("INV-2041")
-    assert clean and po and clean.amount == po.approved_amount, "clean invoice should match its PO"
+    clean = next(i for i in ledger.invoices if i.po_ref and ledger.po_for(i.id))
+    po = ledger.po_for(clean.id)
+    assert po and clean.amount == po.approved_amount, "clean invoice should match its PO exactly"
 
-    # The duplicate is only detectable once the original is paid.
-    assert ledger.duplicate_of("INV-2044") is None, "nothing is a duplicate before anything is paid"
-    ledger.mark_paid(clean.address, clean.amount)
-    dup = ledger.duplicate_of("INV-2044")
-    assert dup and dup.id == "INV-2041", "duplicate of INV-2041 not detected"
+    # Duplicate detection depends on the original having been paid — order matters.
+    dup = next(i for i in ledger.invoices if i.id != clean.id and i.amount == clean.amount)
+    assert ledger.duplicate_of(dup.id) is None, "nothing is a duplicate before anything is paid"
+    ledger.mark_paid(clean.address, clean.amount, invoice_id=clean.id)
+    assert ledger.duplicate_of(dup.id) is not None, "duplicate not detected after the original paid"
 
-    # The anomaly invoice is far outside its vendor's pattern — that is the whole point of it.
-    anomaly = ledger.find("INV-2045")
-    vendor = ledger.vendor_for(anomaly.vendor)
-    assert vendor and vendor.average > 0
-    assert anomaly.amount / vendor.average > 5, "anomaly invoice is not anomalous enough to notice"
+    # Allowlisted vendors must carry the REAL on-chain addresses, or every payment fails for the
+    # wrong reason and the demo proves nothing.
+    approved = {p["address"].lower() for p in PARTIES}
+    for vendor in ledger.vendors.values():
+        if vendor.known:
+            assert vendor.address.lower() in approved, (
+                f"{vendor.name} is marked approved but its address is not an on-chain counterparty"
+            )
 
-    # Hold -> approve puts the invoice back in the payable queue.
-    assert ledger.hold("INV-2045", "10x vendor average") is not None
-    assert ledger.find("INV-2045").status == "held"
+    # Hold -> approve puts an invoice back in the payable queue.
+    target = next(i for i in ledger.invoices if i.status == "pending")
+    assert ledger.hold(target.id, "outside the vendor's usual range") is not None
+    assert ledger.find(target.id).status == "held"
     assert len(ledger.pending_review()) == 1
-    ledger.resolve("INV-2045", True)
-    assert ledger.find("INV-2045").status == "approved"
+    ledger.resolve(target.id, True)
+    assert ledger.find(target.id).status == "approved"
     assert not ledger.pending_review(), "approved item still sitting in the pending queue"
 
 
@@ -223,7 +363,8 @@ check("tool schemas well-formed", _tool_schemas_valid)
 check("injection payload lives in data, not prompt", _injection_payload_present)
 check("compromised prompt cannot reach the limits", _compromised_prompt_cannot_reach_the_limits)
 check("ledger addresses are valid", _ledger_addresses_are_valid)
-check("ledger scenarios produce the narrated decisions", _ledger_scenarios_hold_up)
+check("generator schema enforces the scenario", _generator_schema_enforces_the_scenario)
+check("ledger mechanics hold up on any world", _ledger_mechanics_hold_up)
 check("time travel is chain-gated", _time_travel_is_chain_gated)
 check("amount conversion is exact", _amount_conversion_is_exact)
 

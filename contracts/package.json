@@ -6,7 +6,7 @@
   "scripts": {
     "build": "hardhat compile",
     "test": "hardhat test",
-    "node": "hardhat node",
+    "node": "node scripts/node.mjs",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia"
   },
@@ -14,6 +14,7 @@
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
     "@openzeppelin/contracts": "^5.6.1",
     "@types/node": "^22.8.5",
+    "dotenv": "^17.4.2",
     "forge-std": "foundry-rs/forge-std#v1.9.4",
     "hardhat": "^3.12.0",
     "typescript": "^5",

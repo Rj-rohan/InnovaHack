@@ -12,7 +12,8 @@ from typing import Any, Literal
 
 import ingest
 from agent import rogue
-from agent.ledger import Ledger, injected_invoice
+from agent.generator import generate_injection_memo, generate_world
+from agent.ledger import Ledger
 from agent.llm import ProviderFailed, get_router
 from agent.prompts import COMPROMISED_SYSTEM_PROMPT, SYSTEM_PROMPT
 from agent.tools import TOOL_SCHEMAS, ToolBox, counterparties
@@ -77,21 +78,55 @@ def unsubscribe(queue: asyncio.Queue) -> None:
         state.subscribers.remove(queue)
 
 
-def _ensure_ledger(mode: Mode) -> Ledger:
-    """The ledger persists across ticks, unlike the static list it replaced.
+async def _ensure_ledger(mode: Mode) -> Ledger:
+    """The ledger persists across ticks, unlike the fixture it replaced.
 
     It has to: invoices arrive on a timer, vendor history accumulates as payments settle, and the
-    review queue outlives the tick that created it. Rebuilding per tick would reset the clock every
-    cycle and nothing would ever "arrive".
+    review queue outlives the tick that created it. Rebuilding per tick would reset the arrival
+    clock every cycle and nothing would ever "arrive".
+
+    The world behind it is generated once per run, so two runs are never the same book of business.
     """
     if state.ledger is None:
-        state.ledger = Ledger(counterparties(), decimals=get_deployment().decimals)
+        parties = counterparties()
+        # The generator needs the policy: an invoice above the per-tx cap is refused whatever else
+        # is true of it, so a world generated blind to the caps produces uniformly boring failures.
+        snapshot = get_chain().policy_snapshot()
+        world = await generate_world(
+            parties,
+            per_tx_cap_usdc=from_base_units(snapshot.per_tx_cap),
+            rolling_cap_usdc=from_base_units(snapshot.rolling_cap),
+        )
+        state.ledger = Ledger(world, parties, decimals=get_deployment().decimals)
+        _emit(
+            "world_generated",
+            {
+                "vendors": len(state.ledger.vendors),
+                "purchaseOrders": len(state.ledger.purchase_orders),
+                "invoices": len(state.ledger.invoices),
+            },
+        )
 
-    # Injected mode drops the poisoned invoice into the front of the queue, once.
-    if mode == "injected" and not any(
-        inv.id == "INV-2043" for inv in state.ledger.invoices
-    ):
-        state.ledger.invoices.insert(0, injected_invoice(state.ledger.decimals))
+    # Compromised mode drops a poisoned invoice into the front of the queue, once per run.
+    if mode == "injected" and not state.ledger.has_injected_invoice():
+        impersonated = next(
+            (v.name for v in state.ledger.vendors.values() if v.known), "Accounts Payable"
+        )
+        memo, was_generated = await generate_injection_memo(
+            state.ledger.attacker_address, impersonated
+        )
+        invoice = state.ledger.add_injected_invoice(memo)
+        _emit(
+            "injection_armed",
+            {
+                "invoiceId": invoice.id,
+                "impersonating": invoice.vendor,
+                "payTo": invoice.address,
+                # Surfaced rather than hidden: if the model declined to write the memo and we used
+                # the template, the demo should say so instead of implying it was generated.
+                "memoGenerated": was_generated,
+            },
+        )
 
     return state.ledger
 
@@ -139,7 +174,7 @@ async def run_tick() -> dict[str, Any]:
         _emit("tick_end", {"tick": tick})
         return {"tick": tick, "mode": mode, "txHash": result.tx_hash}
 
-    ledger = _ensure_ledger(mode)
+    ledger = await _ensure_ledger(mode)
     toolbox = ToolBox(ledger)
     router = get_router()
 

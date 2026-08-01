@@ -1,15 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef } from "react";
-import { useWalletConnection } from "@/lib/use-wallet-connection";
-import { Estop, EstopCaption } from "@/components/estop";
-import { Gauge } from "@/components/gauge";
-import { LockoutTag } from "@/components/lockout-tag";
-import { Ticker } from "@/components/ticker";
+import { useEffect, useRef } from "react";
 import { ConnectButton } from "@/components/connect-button";
-import { useFreeze } from "@/lib/use-freeze";
-import { useKillSwitch } from "@/lib/use-kill-switch";
+import { useConsole } from "@/components/console-data";
+import { Estop, EstopCaption } from "@/components/estop";
+import { InstrumentRail } from "@/components/instrument-rail";
+import { LockoutTag } from "@/components/lockout-tag";
 import { formatBlockNumber, shortenAddress } from "@/lib/format";
 
 /**
@@ -20,9 +17,9 @@ import { formatBlockNumber, shortenAddress } from "@/lib/format";
  * sentence — which is a stronger claim than any headline making the same point in words.
  */
 export function Hero() {
-  const data = useKillSwitch();
-  const freeze = useFreeze(data.contracts?.agentWallet);
-  const wallet = useWalletConnection();
+  // Shared with the rail below and anything else on the page: one subscription, not one per
+  // component. `useKillSwitch` opens its own EventSource on every call.
+  const { data, freeze, paused, toggleFreeze, connectError } = useConsole();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Reduced motion holds the footage on its first frame rather than removing it. The frame is
@@ -48,22 +45,6 @@ export function Hero() {
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
   }, []);
-
-  // The contract is the authority; the indexer is a cache of it. Prefer the direct read.
-  const paused = freeze.paused ?? data.state?.paused ?? false;
-
-  // Holding the switch while disconnected opens the wallet rather than doing nothing. One
-  // gesture, and it always advances the visitor toward the thing they reached for.
-  const armAndRun = useCallback(
-    (run: () => void | Promise<void>) => () => {
-      if (!freeze.connected) {
-        wallet.openWallet();
-        return;
-      }
-      void run();
-    },
-    [freeze.connected, wallet],
-  );
 
   // Drives the page-wide desaturation. A stopped machine loses its colour.
   useEffect(() => {
@@ -97,7 +78,7 @@ export function Hero() {
       </div>
 
       {/* --- Instrument strip --- */}
-      <header className="relay relative z-10 mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-10">
+      <header className="relay relative z-10 mx-auto flex w-full max-w-384 flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-10 xl:px-16">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <span className="legend text-placard/70">Kill Switch</span>
           <span className="flex items-center gap-2">
@@ -131,7 +112,7 @@ export function Hero() {
       </header>
 
       {/* --- The thesis --- */}
-      <div className="relative z-10 mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 items-center gap-14 px-6 py-10 sm:px-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-24 lg:py-16">
+      <div className="relative z-10 mx-auto grid w-full max-w-384 flex-1 grid-cols-1 items-center gap-x-16 gap-y-14 px-6 py-10 sm:px-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:py-16 xl:grid-cols-[minmax(0,1.05fr)_auto_20rem] xl:px-16">
         <div className="max-w-xl">
           <h1 className="display text-display text-placard">
             <span className="relay block" style={{ animationDelay: "90ms" }}>
@@ -161,22 +142,14 @@ export function Hero() {
             the agent whether it should be allowed.
           </p>
 
-          {state && (
-            <div
-              className="relay desat mt-9 max-w-sm"
-              style={{ animationDelay: "560ms" }}
-            >
-              <Gauge spent={state.spentInWindow} cap={state.rollingCap} paused={paused} />
-            </div>
-          )}
-
+          {/* Standby state. Deliberately free of setup instructions — this is a product surface,
+              and shell commands belong in SETUP.md, not in front of a visitor. */}
           {!data.loading && !data.deployed && (
             <div className="m-panel mt-8 max-w-md px-4 py-3.5">
-              <p className="legend text-hazard">Nothing deployed yet</p>
+              <p className="legend text-hazard">Standby</p>
               <p className="mt-1.5 text-body text-placard/70">
-                Run <span className="font-mono text-placard">npm run deploy:sepolia</span> in{" "}
-                <span className="font-mono text-placard">contracts/</span>, then start the indexer.
-                Everything below goes live on its own.
+                No wallet is under management right now. Live spend limits, the approved
+                counterparty list and every payment attempt appear here the moment one is.
               </p>
             </div>
           )}
@@ -192,8 +165,8 @@ export function Hero() {
               paused={paused}
               status={freeze.status}
               connected={freeze.connected}
-              onFreeze={armAndRun(freeze.freeze)}
-              onRelease={armAndRun(freeze.unfreeze)}
+              onFreeze={toggleFreeze}
+              onRelease={toggleFreeze}
             />
           </div>
           <EstopCaption
@@ -203,30 +176,20 @@ export function Hero() {
             isOwner={freeze.isOwner}
             // A failed wallet open has to surface here too, or holding the switch with no
             // extension installed looks like the switch itself is broken.
-            error={freeze.error ?? wallet.error}
+            error={freeze.error ?? connectError}
           />
           {paused && <LockoutTag owner={freeze.owner ?? data.owner} />}
         </div>
+
+        {/* --- The readings. Third zone: what the switch is governing. --- */}
+        <div
+          className="relay desat w-full max-w-sm justify-self-center xl:max-w-none xl:justify-self-stretch"
+          style={{ animationDelay: "560ms" }}
+        >
+          <InstrumentRail data={data} paused={paused} />
+        </div>
       </div>
 
-      {/* --- What the agent is actually doing --- */}
-      <div
-        className="relay desat relative z-10 mx-auto w-full max-w-7xl px-6 pb-12 sm:px-10"
-        style={{ animationDelay: "640ms" }}
-      >
-        <div className="flex items-baseline justify-between gap-4 pb-2.5">
-          <p className="legend text-placard/70">Live payments</p>
-          <Link
-            href="/console/activity"
-            className="legend text-placard/50 underline decoration-placard/25 underline-offset-4 transition-colors hover:text-placard"
-          >
-            Full log
-          </Link>
-        </div>
-        <div className="max-w-3xl">
-          <Ticker attempts={data.attempts} limit={4} />
-        </div>
-      </div>
     </section>
   );
 }

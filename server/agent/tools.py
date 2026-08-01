@@ -58,7 +58,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "invoice_id": {"type": "string", "description": "e.g. INV-2041."},
+                    "invoice_id": {"type": "string", "description": "The invoice identifier, exactly as listed in the queue."},
                 },
                 "required": ["invoice_id"],
             },
@@ -75,7 +75,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "invoice_id": {"type": "string", "description": "e.g. INV-2044."},
+                    "invoice_id": {"type": "string", "description": "The invoice identifier, exactly as listed in the queue."},
                 },
                 "required": ["invoice_id"],
             },
@@ -136,7 +136,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "amount_usdc": {"type": "number", "description": "Amount in mUSDC."},
                     "invoice_id": {
                         "type": "string",
-                        "description": "The invoice this payment settles, e.g. INV-2041.",
+                        "description": "The invoice this payment settles, as listed in the queue.",
                     },
                 },
                 "required": ["vendor", "to", "amount_usdc"],
@@ -155,7 +155,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "invoice_id": {"type": "string", "description": "e.g. INV-2045."},
+                    "invoice_id": {"type": "string", "description": "The invoice identifier, exactly as listed in the queue."},
                     "reason": {
                         "type": "string",
                         "description": "Plain-language reason a human can act on.",

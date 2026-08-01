@@ -9,10 +9,13 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "indexer": "tsx --env-file=.env.local scripts/indexer.ts",
-    "db:init": "tsx --env-file=.env.local scripts/db-init.ts"
+    "db:init": "tsx --env-file=.env.local scripts/db-init.ts",
+    "sync:chain": "node scripts/sync-chain.mjs"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@tanstack/react-query": "^5.101.4",
+    "gsap": "^3.15.0",
     "mongodb": "^7.5.0",
     "next": "16.2.12",
     "react": "19.2.4",

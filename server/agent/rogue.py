@@ -1,7 +1,7 @@
 """The compromised agent, with the model removed entirely.
 
 Scenario B has two layers. Layer 1 is indirect prompt injection through a poisoned invoice
-(`prompts.injected_invoices`), which is the interesting demo. This is layer 2: roughly thirty
+(a poisoned invoice), which is the interesting demo. This is layer 2: roughly thirty
 lines that sign a policy-violating transaction and broadcast it, with no LLM anywhere.
 
 Layer 2 is not a fallback for when the demo fails — it is the stronger form of the argument. The
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from chain.client import extract_policy_reason, get_chain
 from config import get_deployment, to_base_units
-from agent.prompts import ATTACKER_ADDRESS
+from agent.generator import random_address
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def run(attack: str = "exfiltrate") -> RogueResult:
     deployment = get_deployment()
 
     if attack == "overspend":
-        to = _first_allowlisted() or ATTACKER_ADDRESS
+        to = _first_allowlisted() or random_address()
         # Comfortably over the per-tx cap, and to a legitimate vendor — so the ONLY thing
         # stopping it is the limit itself, not the allowlist.
         amount = deployment.per_tx_cap * 5
@@ -57,7 +57,7 @@ def run(attack: str = "exfiltrate") -> RogueResult:
             f"Rogue script: pay allowlisted vendor {readable} mUSDC, far over the per-tx cap"
         )
     else:
-        to = ATTACKER_ADDRESS
+        to = random_address()
         amount = to_base_units(35.0)
         description = "Rogue script: drain funds to an address that is not on the allowlist"
 

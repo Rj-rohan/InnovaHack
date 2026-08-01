@@ -31,11 +31,27 @@ const LOCAL_CHAIN_ID = 31337;
 const { viem } = await network.create();
 
 const publicClient = await viem.getPublicClient();
-const walletClients = await viem.getWalletClients();
-const [deployer] = walletClients;
-
 const chainId = await publicClient.getChainId();
 const isLocal = chainId === LOCAL_CHAIN_ID;
+
+// Check the signing key BEFORE asking for wallet clients. Hardhat resolves accounts lazily, so a
+// placeholder key surfaces as a 40-line stack trace out of an elliptic-curve library rather than
+// "you left 0x in your .env" — which is what it actually means, every time.
+if (!isLocal) {
+  const key = process.env.OWNER_PRIVATE_KEY ?? "";
+  if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
+    const detail = key === "" ? "not set" : `set but ${key.length} chars — expected 66`;
+    throw new Error(
+      `OWNER_PRIVATE_KEY is ${detail}.\n` +
+        `  Deploying to chain ${chainId} needs a real funded key in contracts/.env.\n` +
+        "  It must be 0x followed by 64 hex characters.\n" +
+        "  Export it from MetaMask: Account details -> Show private key.",
+    );
+  }
+}
+
+const walletClients = await viem.getWalletClients();
+const [deployer] = walletClients;
 
 console.log(`Deploying to chain ${chainId} as ${deployer.account.address}`);
 if (isLocal) {

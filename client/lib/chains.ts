@@ -94,11 +94,17 @@ export function explorerAddressUrl(address: string, chainId: number = CHAIN_ID):
   return base ? `${base}/address/${address}` : null;
 }
 
+/**
+ * Fallback local endpoint, used only when no `RPC_URL` is set.
+ *
+ * Must match `contracts/rpc.mjs`. 8550 rather than the conventional 8545 because that port is
+ * commonly already held by another node or anvil instance.
+ */
+export const DEFAULT_LOCAL_RPC_URL = "http://127.0.0.1:8550";
+
 /** The RPC every process talks to. One variable, so switching chains never means editing code. */
 export function rpcUrl(): string {
   return (
-    process.env.NEXT_PUBLIC_RPC_URL ??
-    process.env.RPC_URL ??
-    "http://127.0.0.1:8545"
+    process.env.NEXT_PUBLIC_RPC_URL ?? process.env.RPC_URL ?? DEFAULT_LOCAL_RPC_URL
   );
 }

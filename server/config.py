@@ -25,7 +25,10 @@ CHAIN_ID = int(os.getenv("CHAIN_ID", str(LOCAL_CHAIN_ID)))
 # Hardhat's account #1, from the mnemonic printed in every tutorial on the internet. Safe as a
 # default ONLY because it is gated to chain 31337 below; on any other chain the key is required.
 _LOCAL_SESSION_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-_LOCAL_RPC_URL = "http://127.0.0.1:8545"
+# Fallback local endpoint, used only when RPC_URL is unset. Must match `contracts/rpc.mjs` and
+# `client/lib/chains.ts`. 8550 rather than the conventional 8545, which is commonly already held
+# by another node or anvil instance.
+_LOCAL_RPC_URL = "http://127.0.0.1:8550"
 
 
 @dataclass(frozen=True)

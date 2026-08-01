@@ -125,39 +125,24 @@ function Row({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
+/**
+ * Empty state for the console.
+ *
+ * Carries no setup instructions on purpose. This is a product surface an evaluator may land on;
+ * shell commands here read as an unfinished build. Setup lives in SETUP.md.
+ */
 function NotDeployed() {
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="heading text-panel text-placard">Nothing deployed yet</h1>
+      <h1 className="heading text-panel text-placard">No wallet under management</h1>
       <p className="mt-3 text-body text-placard/70">
-        The console reads a deployment record written by the deploy script. Once the contracts are
-        on Sepolia and the indexer is running, this page fills itself in.
+        This console governs a policy-enforcing wallet — its spend limits, approved counterparties,
+        agent session keys and the freeze. Every one of those controls lives in contract storage
+        rather than in the agent, so none of them depend on the agent cooperating.
       </p>
-
-      <ol className="m-panel mt-7 flex flex-col gap-4 px-5 py-5">
-        <Step n={1} cmd="cd contracts && npm run deploy:sepolia">
-          Deploys AgentWallet and MockUSDC, funds the wallet, grants the agent a session key and
-          writes the deployment record.
-        </Step>
-        <Step n={2} cmd="cd client && npx tsx scripts/indexer.ts">
-          Follows contract events and keeps the dashboard&apos;s figures current.
-        </Step>
-        <Step n={3} cmd="cd server && python main.py">
-          Starts the agent so there is something to watch.
-        </Step>
-      </ol>
+      <p className="mt-4 text-body text-placard/45">
+        Nothing is currently detected on the configured network.
+      </p>
     </div>
-  );
-}
-
-function Step({ n, cmd, children }: { n: number; cmd: string; children: React.ReactNode }) {
-  return (
-    <li className="grid grid-cols-[1.5rem_1fr] gap-x-3">
-      <span className="display text-legend leading-6 text-placard/30">{n}</span>
-      <div>
-        <code className="font-mono text-legend text-hazard">{cmd}</code>
-        <p className="mt-1 text-body text-placard/60">{children}</p>
-      </div>
-    </li>
   );
 }
