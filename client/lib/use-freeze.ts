@@ -81,8 +81,11 @@ export function useFreeze(walletAddress: `0x${string}` | undefined): FreezeContr
       } catch (cause) {
         setStatus("error");
         const message = cause instanceof Error ? cause.message : String(cause);
-        // viem surfaces the whole simulated stack; the first line is the useful part.
-        setError(message.split("\n")[0] ?? "transaction failed");
+        // viem surfaces the whole simulated stack; extract the revert reason if present.
+        const reasonMatch = message.match(/reverted with the following reason:\s*([^\n]+)/) ||
+          message.match(/Error: ([^\n]+)/) ||
+          message.match(/reason: ([^\n]+)/);
+        setError(reasonMatch ? reasonMatch[1].trim() : (message.split("\n")[0] ?? "transaction failed"));
       }
     },
     [walletAddress, writeContractAsync, publicClient, pausedQuery],
