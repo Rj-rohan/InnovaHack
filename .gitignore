@@ -1,0 +1,21 @@
+# Dependencies — applies to every subproject (client/, contracts/, ...)
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Hardhat
+artifacts/
+cache/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+*.log

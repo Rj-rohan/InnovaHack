@@ -1,0 +1,19 @@
+# Node modules
+/node_modules
+
+# Compilation output
+/dist
+
+# Hardhat build artifacts
+/artifacts
+/cache
+/types
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local simulated-chain deploy records. The Sepolia one (11155111.json) IS committed on
+# purpose — client/ and server/ read addresses and ABIs from it.
+/deployments/31337.json
