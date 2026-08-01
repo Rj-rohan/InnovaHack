@@ -1,0 +1,17 @@
+# The Kill Switch — agent service
+#
+# `openai` is the client library for BOTH Gemini and Groq. Each exposes an OpenAI-compatible
+# endpoint, so one SDK and one tool-calling loop serve both providers and failover is a base-URL
+# swap rather than a rewrite. There is no `google-genai` or `groq` package here on purpose.
+#
+# Lower bounds rather than exact pins: these are the versions whose APIs the code is written
+# against, and the surfaces used here (chat.completions, eth_account signing) are stable above
+# them. Run `pip freeze > requirements.lock.txt` once the demo works if you want reproducibility.
+
+fastapi>=0.115
+uvicorn[standard]>=0.32
+openai>=2.0
+web3>=7.0
+httpx>=0.27
+python-dotenv>=1.0
+pydantic>=2.9

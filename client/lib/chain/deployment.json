@@ -1,0 +1,18 @@
+{
+  "deployed": false,
+  "chainId": 11155111,
+  "deployedAt": null,
+  "deployBlock": "0",
+  "owner": null,
+  "agentSessionKey": null,
+  "contracts": {
+    "agentWallet": null,
+    "mockUsdc": null
+  },
+  "policy": {
+    "perTxCap": "0",
+    "rollingCap": "0",
+    "decimals": 6
+  },
+  "counterparties": []
+}
