@@ -47,6 +47,10 @@ class EmptyResponse(RuntimeError):
     """Provider returned 200 with no choices — usually a safety block on Gemini."""
 
 
+class ProviderFailed(RuntimeError):
+    """One provider failed. The caller decides whether to retry the turn on another."""
+
+
 class LLMRouter:
     def __init__(self) -> None:
         self._providers: dict[str, Provider] = {}
@@ -91,6 +95,62 @@ class LLMRouter:
             names.insert(0, prefer)
         return [self._providers[name] for name in names]
 
+    def order(self, prefer: str | None = None) -> list[str]:
+        """Provider names, preferred first. Used by the caller to drive per-tick failover."""
+        return [p.name for p in self._order(prefer)]
+
+    async def chat_with(
+        self,
+        provider_name: str,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        temperature: float = 0.2,
+    ) -> LLMResult:
+        """Call exactly one provider, with a single retry on rate limit. Raises on failure.
+
+        Deliberately does not fail over. A conversation that already contains one provider's
+        assistant messages cannot be handed to another mid-flight — Gemini attaches a
+        `thought_signature` to its function calls and rejects a history missing it, and the reverse
+        contamination is equally unsafe. Failover therefore happens one level up, by restarting the
+        turn with a clean history. See `agent/loop.py`.
+        """
+        provider = self._providers.get(provider_name)
+        if provider is None:
+            raise AllProvidersFailed(f"unknown provider {provider_name}")
+
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                response = await provider.client.chat.completions.create(
+                    model=provider.model,
+                    messages=messages,  # type: ignore[arg-type]
+                    tools=tools,  # type: ignore[arg-type]
+                    tool_choice="auto" if tools else None,  # type: ignore[arg-type]
+                    temperature=temperature,
+                )
+                if not response.choices:
+                    raise EmptyResponse(
+                        f"{provider.name} returned no choices (likely a safety block)"
+                    )
+                return LLMResult(
+                    provider=provider.name,
+                    model=provider.model,
+                    message=response.choices[0].message,
+                )
+            except RateLimitError as exc:
+                last_error = exc
+                if attempt == 0:
+                    delay = 1.5 + random.random()
+                    log.warning("%s rate limited, retrying in %.1fs", provider.name, delay)
+                    await asyncio.sleep(delay)
+                    continue
+                break
+            except (APIStatusError, APIError, EmptyResponse) as exc:
+                last_error = exc
+                break
+
+        raise ProviderFailed(f"{provider_name}: {last_error}") from last_error
+
     async def chat(
         self,
         messages: list[dict[str, Any]],
@@ -98,6 +158,7 @@ class LLMRouter:
         prefer: str | None = None,
         temperature: float = 0.2,
     ) -> LLMResult:
+        """Single-shot call with failover. Safe only when `messages` has no assistant tool calls."""
         last_error: Exception | None = None
 
         for provider in self._order(prefer):

@@ -20,7 +20,7 @@ import ingest
 from agent import loop, rogue
 from agent.llm import get_router
 from chain.client import get_chain
-from config import from_base_units, get_deployment
+from config import from_base_units, get_chain_profile, get_deployment
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s"
@@ -34,16 +34,21 @@ async def lifespan(_: FastAPI):
     router = get_router()
 
     deployment = get_deployment()
+    profile = get_chain_profile(deployment.chain_id)
+
+    log.info("chain        %s (%s)", profile.label, deployment.chain_id)
     log.info("wallet       %s", deployment.wallet_address)
     log.info("session key  %s", chain.address)
     log.info("providers    %s", ", ".join(router.available))
 
-    gas = chain.eth_balance()
-    if gas == 0:
+    if chain.eth_balance() == 0:
+        how = (
+            "Is `npx hardhat node` running, and was the contract deployed against it?"
+            if profile.allow_time_travel
+            else f"Fund {chain.address} from a faucet."
+        )
         log.warning(
-            "Session key has 0 ETH — it pays its own gas, so every payment will fail. "
-            "Fund %s from a Sepolia faucet.",
-            chain.address,
+            "Session key has 0 ETH — it pays its own gas, so every payment will fail. %s", how
         )
 
     yield
@@ -135,6 +140,39 @@ async def set_mode(body: ModeRequest) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Hold-for-review queue
+#
+# The agent service owns this queue; Mongo holds a projection of it for the console to render.
+# Owner decisions therefore come here rather than to the database, which keeps a single writer and
+# avoids a two-way sync.
+#
+# Worth being precise about in the demo: this is a SOFT control. It is the agent choosing to defer,
+# and a compromised agent would simply not use it. The contract is the hard control.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/agent/review")
+async def list_review() -> dict[str, Any]:
+    return {"items": loop.review_queue()}
+
+
+@app.post("/agent/review/{invoice_id}/approve")
+async def approve_review(invoice_id: str) -> dict[str, Any]:
+    item = await loop.resolve_review(invoice_id, approved=True)
+    if item is None:
+        raise HTTPException(404, f"no review item for {invoice_id}")
+    return item
+
+
+@app.post("/agent/review/{invoice_id}/reject")
+async def reject_review(invoice_id: str) -> dict[str, Any]:
+    item = await loop.resolve_review(invoice_id, approved=False)
+    if item is None:
+        raise HTTPException(404, f"no review item for {invoice_id}")
+    return item
+
+
+# ---------------------------------------------------------------------------
 # Live reasoning stream
 # ---------------------------------------------------------------------------
 
@@ -171,6 +209,49 @@ async def stream() -> StreamingResponse:
 # ---------------------------------------------------------------------------
 # Demo scenarios
 # ---------------------------------------------------------------------------
+
+
+@app.post("/demo/advance-time")
+async def advance_time(hours: int = 25) -> dict[str, Any]:
+    """Jump the chain clock forward, to demonstrate the rolling 24h window live.
+
+    Spend to the cap, watch the next payment refused, advance 25 hours, watch the same payment
+    succeed — proof the window genuinely rolls rather than resetting at midnight. On a public
+    network this is impossible, which is why it was previously only provable in a unit test.
+
+    Gated on the chain id at call time, not on an env flag: the endpoint cannot function against a
+    public network even if the service is deployed with it present.
+    """
+    chain = get_chain()
+    profile = get_chain_profile(chain.deployment.chain_id)
+
+    if not profile.allow_time_travel:
+        raise HTTPException(
+            400,
+            f"Time travel is not available on {profile.label} (chain "
+            f"{profile.chain_id}). It only works against a local dev node.",
+        )
+
+    if hours <= 0:
+        raise HTTPException(400, "hours must be positive")
+
+    seconds = hours * 3600
+    before = chain.w3.eth.get_block("latest")["timestamp"]
+    chain.w3.provider.make_request("evm_increaseTime", [seconds])
+    chain.w3.provider.make_request("evm_mine", [])
+    after = chain.w3.eth.get_block("latest")["timestamp"]
+
+    snapshot = chain.policy_snapshot()
+    loop.emit("time_travel", {"hours": hours, "spentUsdc": round(from_base_units(snapshot.spent_in_window), 2)})
+
+    return {
+        "advancedHours": hours,
+        "blockTimestampBefore": before,
+        "blockTimestampAfter": after,
+        "spentInWindowUsdc": round(from_base_units(snapshot.spent_in_window), 2),
+        "remainingUsdc": round(from_base_units(snapshot.remaining), 2),
+        "note": "Spend older than 24h has aged out of the rolling window.",
+    }
 
 
 @app.post("/demo/scenario/a")

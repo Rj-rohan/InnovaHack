@@ -26,28 +26,61 @@ function required(name: string): string {
   return value;
 }
 
+const LOCAL_CHAIN_ID = 31337;
+
 const { viem } = await network.create();
 
 const publicClient = await viem.getPublicClient();
-const [deployer] = await viem.getWalletClients();
+const walletClients = await viem.getWalletClients();
+const [deployer] = walletClients;
 
 const chainId = await publicClient.getChainId();
-console.log(`Deploying to chain ${chainId} as ${deployer.account.address}`);
+const isLocal = chainId === LOCAL_CHAIN_ID;
 
-// The agent's session key is generated separately and lives only in server/.env. The deployer
-// (owner) key must never be the same account — the entire premise is that the process running
-// the agent cannot unpause itself.
-const agentSessionKey = getAddress(required("AGENT_SESSION_KEY_ADDRESS"));
+console.log(`Deploying to chain ${chainId} as ${deployer.account.address}`);
+if (isLocal) {
+  console.log("Local dev chain — using the node's deterministic accounts, no env vars needed.\n");
+  // Deployment itself wants instant mining. Interval mining is switched on at the end.
+  await publicClient.request({
+    method: "evm_setAutomine" as never,
+    params: [true] as never,
+  });
+}
+
+/**
+ * On the local dev chain, take an address from the node's pre-funded deterministic accounts.
+ * On any other chain, require it explicitly.
+ *
+ * The split matters: Hardhat's accounts are derived from a mnemonic printed in every tutorial on
+ * the internet. Defaulting to them on a public network would mean deploying a wallet whose owner
+ * key is public knowledge, so that path stays closed and env vars stay mandatory off-31337.
+ */
+function participant(index: number, envName: string): `0x${string}` {
+  if (!isLocal) return getAddress(required(envName));
+
+  const client = walletClients[index];
+  if (!client) {
+    throw new Error(
+      `The local node exposed only ${walletClients.length} accounts; need at least ${index + 1}. ` +
+        "Start it with `npx hardhat node`.",
+    );
+  }
+  return getAddress(client.account.address);
+}
+
+// The agent's session key. It must never be the owner account — the entire premise is that the
+// process running the agent cannot unpause itself.
+const agentSessionKey = participant(1, "AGENT_SESSION_KEY_ADDRESS");
 if (agentSessionKey.toLowerCase() === deployer.account.address.toLowerCase()) {
   throw new Error(
-    "AGENT_SESSION_KEY_ADDRESS must not equal the owner/deployer address — the agent would be able to unfreeze itself.",
+    "The agent session key must not equal the owner/deployer address — the agent would be able to unfreeze itself.",
   );
 }
 
 // Demo counterparties. Any address works; these only ever receive mUSDC.
-const vendorAcme = getAddress(required("DEMO_VENDOR_1"));
-const vendorGlobex = getAddress(required("DEMO_VENDOR_2"));
-const gasRefill = getAddress(required("DEMO_GAS_REFILL"));
+const vendorAcme = participant(2, "DEMO_VENDOR_1");
+const vendorGlobex = participant(3, "DEMO_VENDOR_2");
+const gasRefill = participant(4, "DEMO_GAS_REFILL");
 
 console.log("\nDeploying MockUSDC...");
 const usdc = await viem.deployContract("MockUSDC");
@@ -132,10 +165,52 @@ const outFile = join(outDir, `${chainId}.json`);
 writeFileSync(outFile, `${JSON.stringify(record, null, 2)}\n`);
 
 console.log(`\nWrote ${outFile}`);
+
+if (isLocal) {
+  /**
+   * Switch the node from automine to interval mining.
+   *
+   * This is not cosmetic. With automine on, Hardhat simulates every transaction at submission and
+   * *rejects* one that would revert — it never reaches a block. That would quietly destroy the
+   * central demo: a policy-violating payment would surface as a client-side error instead of a
+   * reverted transaction on chain, and there would be nothing for the indexer to decode.
+   *
+   * With automine off, transactions enter a mempool and are mined on a timer exactly as they are
+   * on a public network, so a refused payment becomes a real reverted transaction with real revert
+   * data. Two-second blocks also give the owner a genuine window to land a freeze mid-run, without
+   * Sepolia's twelve-second wait.
+   */
+  const BLOCK_TIME_MS = 2000;
+  await publicClient.request({
+    method: "evm_setAutomine" as never,
+    params: [false] as never,
+  });
+  await publicClient.request({
+    method: "evm_setIntervalMining" as never,
+    params: [BLOCK_TIME_MS] as never,
+  });
+  console.log(
+    `\nNode switched to interval mining (${BLOCK_TIME_MS}ms blocks).\n` +
+      "  Failing transactions now mine as reverted rather than being rejected on submit —\n" +
+      "  which is what makes a blocked payment visible on chain.\n" +
+      "  Restarting the node resets this; re-run this script after any restart.",
+  );
+}
+
 console.log("\nNext steps:");
-console.log(`  1. Set NEXT_PUBLIC_WALLET_ADDRESS=${wallet.address} in client/.env.local`);
-console.log(`  2. Set WALLET_ADDRESS=${wallet.address} in server/.env`);
-console.log(`  3. Verify: npx hardhat verify --network sepolia ${wallet.address} \\`);
-console.log(
-  `       ${usdc.address} ${deployer.account.address} ${PER_TX_CAP} ${ROLLING_CAP}`,
-);
+console.log("  1. cd ../client && CHAIN_ID=" + chainId + " npm run sync:chain");
+
+if (isLocal) {
+  console.log("  2. Nothing else — client/ and server/ default to chain 31337.");
+  console.log(
+    "\n  The agent signs as account #1 (" +
+      agentSessionKey +
+      ").\n  server/.env.example already carries that account's well-known test key.",
+  );
+} else {
+  console.log(`  2. Set CHAIN_ID=${chainId} and RPC_URL in client/.env.local and server/.env`);
+  console.log(`  3. Verify: npx hardhat verify --network sepolia ${wallet.address} \\`);
+  console.log(
+    `       ${usdc.address} ${deployer.account.address} ${PER_TX_CAP} ${ROLLING_CAP}`,
+  );
+}

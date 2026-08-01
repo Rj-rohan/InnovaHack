@@ -388,8 +388,17 @@ body {
     linear-gradient(200deg, var(--color-enamel-hi) 0%, var(--color-enamel) 45%, var(--color-iron) 100%);
 }
 
-/* Held well down. The photograph is atmosphere — the moment it competes with the type or the
-   switch, it has stopped doing its job. */
+/* The footage plays close to full strength — it is the background, not a texture. Colour is
+   pulled toward the enamel palette with `saturate` rather than a luminosity blend: blending
+   against the chassis at low opacity greys the picture out until motion reads as blur, which is
+   exactly how this looked before. */
+.hero-plate video {
+  opacity: 0.92;
+  filter: saturate(0.72) contrast(1.06) brightness(0.92);
+}
+
+/* The still, when used instead, stays faint and gets the slow push-in. Footage already moves;
+   a second motion on top of it just makes the page feel unsteady. */
 .hero-plate img {
   mix-blend-mode: luminosity;
   opacity: 0.26;
@@ -397,20 +406,27 @@ body {
   animation: plate-drift 40s ease-in-out infinite alternate;
 }
 
-/* 8% hazard multiply + a vignette down to iron. */
+/* Legibility comes from a scrim under the text, not from dimming the whole frame. The left side
+   carries the headline, so that is where the cover is heaviest; the right stays open so the
+   footage is actually visible behind the switch. */
 .hero-wash {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(
-      110% 80% at 62% 38%,
-      rgb(49 58 54 / 0.35) 0%,
-      rgb(31 37 35 / 0.82) 62%,
-      var(--color-iron) 100%
+    /* Heaviest under the headline on the left. Eased off through the middle so the footage is
+       genuinely visible, then brought back up on the right: the brightest part of this clip sits
+       centre-right, which is exactly where the E-stop is, and two competing accents there would
+       cost the switch its authority. */
+    linear-gradient(
+      100deg,
+      rgb(31 37 35 / 0.93) 0%,
+      rgb(31 37 35 / 0.78) 32%,
+      rgb(31 37 35 / 0.46) 58%,
+      rgb(31 37 35 / 0.6) 100%
     ),
-    linear-gradient(180deg, rgb(31 37 35 / 0.55) 0%, transparent 30%, var(--color-enamel) 100%),
-    linear-gradient(0deg, rgb(242 183 5 / 0.08), rgb(242 183 5 / 0.08));
+    linear-gradient(180deg, rgb(31 37 35 / 0.72) 0%, transparent 24%, transparent 62%, var(--color-enamel) 100%),
+    linear-gradient(0deg, rgb(242 183 5 / 0.05), rgb(242 183 5 / 0.05));
 }
 
 @keyframes plate-drift {
@@ -428,7 +444,8 @@ body {
   position: absolute;
   inset: -50%;
   pointer-events: none;
-  opacity: 0.055;
+  /* Kept very low over footage: grain on top of moving video reads as compression noise. */
+  opacity: 0.032;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
   animation: grain-shift 1.2s steps(4) infinite;

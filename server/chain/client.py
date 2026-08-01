@@ -10,6 +10,7 @@ Nothing in this module validates policy. That is deliberate and load-bearing; se
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,6 +35,35 @@ BLOCK_REASONS = [
 # Used when gas estimation fails. A policy-violating transaction reverts during estimation, so
 # estimation failure is the NORMAL case for the attack scenario — see send_payment.
 FALLBACK_GAS = 250_000
+
+#: Contract custom errors mapped onto the same vocabulary `PaymentBlocked` and the indexer use.
+_ERROR_TO_REASON = {
+    "WalletPaused": "Paused",
+    "SessionInvalid": "SessionInvalid",
+    "CounterpartyNotAllowed": "CounterpartyNotAllowed",
+    "SpendLimitExceeded": "PerTxCapExceeded",
+    "RollingLimitExceeded": "RollingCapExceeded",
+    "InsufficientBalance": "InsufficientBalance",
+    "SpendHistoryFull": "SpendHistoryFull",
+    "NotOwner": "NotOwner",
+}
+
+_CUSTOM_ERROR_RE = re.compile(r"custom error '([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def extract_policy_reason(error: BaseException) -> str | None:
+    """Pull a policy reason out of a node's rejection message.
+
+    Normally a refused payment is mined as a reverted transaction and the indexer decodes the
+    reason from chain data. But a node running with eager validation (Hardhat's automine) rejects
+    the transaction at submission instead, so the only place the reason exists is the RPC error
+    text. Parsing it here keeps the dashboard showing "CounterpartyNotAllowed" rather than a raw
+    JSON-RPC blob, whichever way the node behaves.
+    """
+    match = _CUSTOM_ERROR_RE.search(str(error))
+    if not match:
+        return None
+    return _ERROR_TO_REASON.get(match.group(1), match.group(1))
 
 
 @dataclass

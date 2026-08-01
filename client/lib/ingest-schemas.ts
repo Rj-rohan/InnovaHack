@@ -56,8 +56,19 @@ export const txAttemptSchema = z.object({
   mode: agentMode,
 });
 
+export const reviewItemSchema = z.object({
+  runId: z.string().min(1),
+  invoiceId: z.string().min(1),
+  vendor: z.string().min(1),
+  address,
+  amount: baseUnits,
+  reason: z.string().default(""),
+  status: z.enum(["pending", "approved", "rejected"]).default("pending"),
+});
+
 export type DecisionInput = z.infer<typeof decisionSchema>;
 export type TxAttemptInput = z.infer<typeof txAttemptSchema>;
+export type ReviewItemInput = z.infer<typeof reviewItemSchema>;
 
 /** Constant-time-ish shared-secret check for the ingest routes. */
 export function authorized(request: Request): boolean {

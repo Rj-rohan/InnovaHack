@@ -10,7 +10,7 @@ import { Ticker } from "@/components/ticker";
 import { formatFixed6, shortenAddress } from "@/lib/format";
 
 export default function ConsoleOverview() {
-  const { data, freeze, paused, toggleFreeze } = useConsole();
+  const { data, freeze, paused, toggleFreeze, connectError } = useConsole();
   const state = data.state;
 
   if (!data.loading && !data.deployed) {
@@ -92,7 +92,7 @@ export default function ConsoleOverview() {
             status={freeze.status}
             connected={freeze.connected}
             isOwner={freeze.isOwner}
-            error={freeze.error}
+            error={freeze.error ?? connectError}
           />
           {paused && <LockoutTag owner={freeze.owner ?? data.owner} />}
         </div>
@@ -140,7 +140,7 @@ function NotDeployed() {
           writes the deployment record.
         </Step>
         <Step n={2} cmd="cd client && npx tsx scripts/indexer.ts">
-          Follows contract events and keeps the dashboard's figures current.
+          Follows contract events and keeps the dashboard&apos;s figures current.
         </Step>
         <Step n={3} cmd="cd server && python main.py">
           Starts the agent so there is something to watch.

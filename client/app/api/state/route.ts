@@ -24,12 +24,13 @@ export async function GET() {
 
   const c = await collections();
 
-  const [state, attempts, events, decisions, run] = await Promise.all([
+  const [state, attempts, events, decisions, run, reviewItems] = await Promise.all([
     c.chainState.findOne({ _id: "singleton" }),
     c.txAttempts.find({}).sort({ createdAt: -1 }).limit(50).toArray(),
     c.policyEvents.find({}).sort({ blockNumber: -1, logIndex: -1 }).limit(50).toArray(),
     c.decisions.find({}).sort({ createdAt: -1 }).limit(25).toArray(),
     c.runs.find({}).sort({ startedAt: -1 }).limit(1).next(),
+    c.reviewItems.find({}).sort({ createdAt: -1 }).limit(25).toArray(),
   ]);
 
   return Response.json({
@@ -44,6 +45,7 @@ export async function GET() {
     events,
     decisions,
     run,
+    reviewItems,
     // Null until the indexer has written once — the UI should say "indexer not running" rather
     // than silently showing stale-looking zeroes.
     indexerHealthy: state != null && Date.now() - new Date(state.updatedAt).getTime() < 30_000,

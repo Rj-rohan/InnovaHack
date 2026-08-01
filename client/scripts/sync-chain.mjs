@@ -6,7 +6,8 @@
  * couple the Next build to Hardhat output that does not exist on a fresh clone or on Vercel,
  * so the boundary is crossed here, once, deliberately — and never at build time.
  *
- *   npm run sync:chain            # after `npm run deploy:sepolia` in contracts/
+ *   npm run sync:chain            # after deploying in contracts/
+ *   CHAIN_ID=11155111 npm run sync:chain   # when targeting a public network
  *   CHAIN_ID=31337 npm run sync:chain
  */
 
@@ -19,7 +20,8 @@ const clientRoot = join(here, "..");
 const contractsRoot = join(clientRoot, "..", "contracts");
 const outDir = join(clientRoot, "lib", "chain");
 
-const chainId = Number(process.env.CHAIN_ID ?? 11155111);
+// Defaults to the local dev chain. Override with CHAIN_ID when targeting a public network.
+const chainId = Number(process.env.CHAIN_ID ?? 31337);
 
 mkdirSync(outDir, { recursive: true });
 
@@ -64,14 +66,14 @@ if (existsSync(recordPath)) {
   const record = JSON.parse(readFileSync(recordPath, "utf8"));
 
   // The ABIs already live in abi.ts; carrying a second copy here would let the two drift.
-  const { abi: _abi, ...rest } = record;
+  delete record.abi;
 
-  writeFileSync(targetPath, `${JSON.stringify({ deployed: true, ...rest }, null, 2)}\n`);
+  writeFileSync(targetPath, `${JSON.stringify({ deployed: true, ...record }, null, 2)}\n`);
   console.log(`deployment.json  chain ${record.chainId} @ ${record.contracts.agentWallet}`);
 } else if (existsSync(targetPath)) {
   console.warn(
     `No deployment at ${recordPath} — keeping the existing deployment.json.\n` +
-      `Deploy with \`npm run deploy:sepolia\` in contracts/, then re-run this.`,
+      `Deploy first in contracts/ (\`npm run deploy:local\` or \`npm run deploy:sepolia\`), then re-run this.`,
   );
 } else {
   writeFileSync(

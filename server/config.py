@@ -18,7 +18,58 @@ from dotenv import load_dotenv
 load_dotenv()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CHAIN_ID = int(os.getenv("CHAIN_ID", "11155111"))
+
+LOCAL_CHAIN_ID = 31337
+CHAIN_ID = int(os.getenv("CHAIN_ID", str(LOCAL_CHAIN_ID)))
+
+# Hardhat's account #1, from the mnemonic printed in every tutorial on the internet. Safe as a
+# default ONLY because it is gated to chain 31337 below; on any other chain the key is required.
+_LOCAL_SESSION_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+_LOCAL_RPC_URL = "http://127.0.0.1:8545"
+
+
+@dataclass(frozen=True)
+class ChainProfile:
+    """Mirror of `client/lib/chains.ts`. Nothing in the service hardcodes a chain."""
+
+    chain_id: int
+    label: str
+    default_rpc: str | None
+    default_tick_seconds: int
+    #: Whether `evm_increaseTime` may be used. True only for a dev chain — this is checked at
+    #: call time, so the time-travel endpoint cannot function on a public network even if the
+    #: service is deployed with it present.
+    allow_time_travel: bool
+
+
+CHAIN_PROFILES: dict[int, ChainProfile] = {
+    LOCAL_CHAIN_ID: ChainProfile(
+        chain_id=LOCAL_CHAIN_ID,
+        label="Hardhat (local)",
+        default_rpc=_LOCAL_RPC_URL,
+        # Instant blocks, so the agent can think at a watchable pace rather than waiting on the
+        # chain. On a public network this would just race block production.
+        default_tick_seconds=8,
+        allow_time_travel=True,
+    ),
+    11155111: ChainProfile(
+        chain_id=11155111,
+        label="Sepolia",
+        default_rpc=None,
+        default_tick_seconds=25,
+        allow_time_travel=False,
+    ),
+}
+
+
+def get_chain_profile(chain_id: int = CHAIN_ID) -> ChainProfile:
+    profile = CHAIN_PROFILES.get(chain_id)
+    if profile is None:
+        raise RuntimeError(
+            f"No chain profile for chain {chain_id}. Add one to server/config.py "
+            "(and client/lib/chains.ts) — chain-specific settings are resolved from there."
+        )
+    return profile
 
 
 def _require(name: str) -> str:
@@ -48,9 +99,22 @@ class Deployment:
     def load(cls, chain_id: int = CHAIN_ID) -> "Deployment":
         path = REPO_ROOT / "contracts" / "deployments" / f"{chain_id}.json"
         if not path.exists():
+            how = (
+                "npx hardhat node   (then, in another terminal)   npm run deploy:local"
+                if chain_id == LOCAL_CHAIN_ID
+                else "npm run deploy:sepolia"
+            )
+            available = sorted(
+                p.stem for p in (REPO_ROOT / "contracts" / "deployments").glob("*.json")
+            ) if (REPO_ROOT / "contracts" / "deployments").exists() else []
+            hint = (
+                f"\nDeployments that DO exist: {', '.join(available)}. "
+                f"If you meant one of those, set CHAIN_ID accordingly in server/.env."
+                if available
+                else ""
+            )
             raise RuntimeError(
-                f"No deployment record at {path}.\n"
-                "Deploy the contracts first:  cd contracts && npm run deploy:sepolia"
+                f"No deployment record at {path}.\nDeploy first:  cd contracts && {how}{hint}"
             )
 
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -94,9 +158,28 @@ class Settings:
                 "Set at least one of GEMINI_API_KEY or GROQ_API_KEY in server/.env."
             )
 
+        profile = get_chain_profile()
+        is_local = profile.chain_id == LOCAL_CHAIN_ID
+
+        rpc_url = os.getenv("RPC_URL") or profile.default_rpc
+        if not rpc_url:
+            raise RuntimeError(
+                f"RPC_URL is required for chain {profile.chain_id} ({profile.label})."
+            )
+
+        # The well-known Hardhat key is a default only on the local dev chain. Off 31337 the key
+        # stays mandatory, so a deployment can never be signed by a publicly-known account.
+        session_key = os.getenv("AGENT_SESSION_KEY_PRIVATE") or (
+            _LOCAL_SESSION_KEY if is_local else ""
+        )
+        if not session_key:
+            raise RuntimeError(
+                "AGENT_SESSION_KEY_PRIVATE is required on any chain other than the local dev node."
+            )
+
         return cls(
-            rpc_url=_require("SEPOLIA_RPC_URL"),
-            session_key_private=_require("AGENT_SESSION_KEY_PRIVATE"),
+            rpc_url=rpc_url,
+            session_key_private=session_key,
             ingest_url=os.getenv("INGEST_URL", "http://localhost:3000"),
             ingest_secret=_require("INGEST_SECRET"),
             gemini_api_key=gemini,
@@ -107,9 +190,10 @@ class Settings:
             # An open-weight model for the compromised agent. Less injection-hardened, which is
             # exactly what the attack scenario needs, and it doubles as Groq-speed failover.
             groq_model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-            # Sepolia blocks are ~12s. Ticking faster just races the chain and burns rate limit.
-            tick_seconds=int(os.getenv("AGENT_TICK_SECONDS", "25")),
-            max_tool_iterations=int(os.getenv("MAX_TOOL_ITERATIONS", "6")),
+            tick_seconds=int(
+                os.getenv("AGENT_TICK_SECONDS", str(profile.default_tick_seconds))
+            ),
+            max_tool_iterations=int(os.getenv("MAX_TOOL_ITERATIONS", "8")),
         )
 
 

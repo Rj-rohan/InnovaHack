@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
+import { useChainId, useDisconnect, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { DotField } from "@/components/ui/dot-field";
 import { useFreeze } from "@/lib/use-freeze";
 import { useKillSwitch } from "@/lib/use-kill-switch";
+import { useWalletConnection } from "@/lib/use-wallet-connection";
 import { shortenAddress } from "@/lib/format";
 
 /**
@@ -20,8 +21,8 @@ import { shortenAddress } from "@/lib/format";
  * enough, and what to do if it isn't.
  */
 export function SignInCard() {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending, error } = useConnect();
+  const { address, isConnected, hasProvider, openWallet, isPending, error } =
+    useWalletConnection();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
@@ -29,10 +30,9 @@ export function SignInCard() {
   const data = useKillSwitch();
   const freeze = useFreeze(data.contracts?.agentWallet);
 
-  const injected = connectors[0];
   const owner = freeze.owner ?? data.owner ?? null;
   const wrongNetwork = isConnected && chainId !== sepolia.id;
-  const noWallet = !injected;
+  const noWallet = hasProvider === false;
 
   return (
     <main className="relative flex min-h-svh items-center justify-center overflow-hidden px-5 py-12">
@@ -42,7 +42,7 @@ export function SignInCard() {
 
       {/* Vignette, so the card is not competing with the field behind it. */}
       <div
-        className="absolute inset-0 z-[1]"
+        className="absolute inset-0 z-1"
         aria-hidden="true"
         style={{
           background:
@@ -75,7 +75,7 @@ export function SignInCard() {
             className="legend w-full px-5 py-3.5 text-ink transition-opacity hover:opacity-90 disabled:opacity-60"
             style={{ backgroundColor: "var(--color-hazard)" }}
             disabled={isPending}
-            onClick={() => connect({ connector: injected })}
+            onClick={openWallet}
           >
             {isPending ? "Check your wallet…" : "Connect wallet"}
           </button>
@@ -137,7 +137,7 @@ export function SignInCard() {
 
         {error && (
           <p className="legend mt-4 text-estop" role="alert">
-            {error.message.split("\n")[0]}
+            {error}
           </p>
         )}
 

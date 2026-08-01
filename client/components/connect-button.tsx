@@ -1,39 +1,26 @@
 "use client";
 
-import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
+import { useChainId, useDisconnect, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { shortenAddress } from "@/lib/format";
+import { useWalletConnection } from "@/lib/use-wallet-connection";
 
 /**
  * Wallet connection for the owner.
  *
- * Three states, each saying what to do rather than what is wrong: not connected, connected to the
- * wrong network, connected. The dashboard itself holds no keys — everything readable on the page
- * stays readable without connecting.
+ * Four states, each saying what to do rather than what is wrong: no wallet installed, not
+ * connected, connected to the wrong network, connected. Failures are shown — an earlier version
+ * swallowed `useConnect().error`, so a click with no extension installed did nothing at all and
+ * looked like a dead button.
  */
 export function ConnectButton({ className = "" }: { className?: string }) {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
+  const { address, isConnected, hasProvider, openWallet, isPending, error } =
+    useWalletConnection();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
-  const injected = connectors[0];
-
-  if (!isConnected) {
-    return (
-      <button
-        type="button"
-        className={`legend m-panel px-3 py-2 text-placard transition-colors hover:bg-enamel-lo ${className}`}
-        disabled={!injected || isPending}
-        onClick={() => injected && connect({ connector: injected })}
-      >
-        {isPending ? "Connecting…" : "Connect wallet"}
-      </button>
-    );
-  }
-
-  if (chainId !== sepolia.id) {
+  if (isConnected && chainId !== sepolia.id) {
     return (
       <button
         type="button"
@@ -46,15 +33,50 @@ export function ConnectButton({ className = "" }: { className?: string }) {
     );
   }
 
+  if (isConnected) {
+    return (
+      <button
+        type="button"
+        className={`legend m-panel group px-3 py-2 font-mono text-placard transition-colors hover:bg-enamel-lo ${className}`}
+        onClick={() => disconnect()}
+        title="Disconnect"
+      >
+        <span className="group-hover:hidden">{shortenAddress(address ?? "")}</span>
+        <span className="hidden group-hover:inline">Disconnect</span>
+      </button>
+    );
+  }
+
+  // Detected as absent — send them somewhere useful instead of failing on click.
+  if (hasProvider === false) {
+    return (
+      <a
+        href="https://metamask.io/download/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`legend m-panel px-3 py-2 text-placard transition-colors hover:bg-enamel-lo ${className}`}
+        title="No browser wallet detected"
+      >
+        Install a wallet
+      </a>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      className={`legend m-panel group px-3 py-2 font-mono text-placard transition-colors hover:bg-enamel-lo ${className}`}
-      onClick={() => disconnect()}
-      title="Disconnect"
-    >
-      <span className="group-hover:hidden">{shortenAddress(address ?? "")}</span>
-      <span className="hidden group-hover:inline">Disconnect</span>
-    </button>
+    <div className={`flex flex-col items-end gap-1 ${className}`}>
+      <button
+        type="button"
+        className="legend m-panel px-3 py-2 text-placard transition-colors hover:bg-enamel-lo disabled:opacity-60"
+        disabled={isPending}
+        onClick={openWallet}
+      >
+        {isPending ? "Check your wallet…" : "Connect wallet"}
+      </button>
+      {error && (
+        <p className="legend max-w-56 text-right text-estop" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

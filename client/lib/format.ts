@@ -42,6 +42,23 @@ export function formatFixed6(value: string | bigint): string {
   return `${negative ? "-" : ""}${whole}.${fraction}`;
 }
 
+/**
+ * Human input -> base units. Returns null on anything it will not vouch for, so callers show a
+ * message rather than silently sending a wrong cap on chain.
+ *
+ * Never goes through `Number`: `parseFloat("0.1") * 1e6` is 100000.00000000001, and rounding that
+ * into a spend limit is exactly the class of bug this project exists to talk about.
+ */
+export function parseAmount(input: string): bigint | null {
+  const trimmed = input.trim().replace(/,/g, "");
+  if (trimmed === "" || trimmed === "." || !/^\d*\.?\d*$/.test(trimmed)) return null;
+
+  const [whole = "0", fraction = ""] = trimmed.split(".");
+  if (fraction.length > DECIMALS) return null;
+
+  return BigInt(whole || "0") * 10n ** BigInt(DECIMALS) + BigInt(fraction.padEnd(DECIMALS, "0") || "0");
+}
+
 /** Percentage of a cap consumed, clamped to 100. Both arguments are base-unit strings. */
 export function percentOf(part: string | bigint, whole: string | bigint): number {
   const p = typeof part === "bigint" ? part : BigInt(part || "0");

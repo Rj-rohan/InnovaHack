@@ -1,9 +1,9 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo } from "react";
-import { useConnect } from "wagmi";
 import { useFreeze, type FreezeControls } from "@/lib/use-freeze";
 import { useKillSwitch, type KillSwitchData } from "@/lib/use-kill-switch";
+import { useWalletConnection } from "@/lib/use-wallet-connection";
 
 /**
  * One data subscription for the whole console.
@@ -20,6 +20,8 @@ interface ConsoleData {
   paused: boolean;
   /** Freeze/release, connecting the wallet first if there isn't one. */
   toggleFreeze: () => void;
+  /** A failed wallet open. Separate from `freeze.error`, which is a failed transaction. */
+  connectError: string | null;
 }
 
 const Ctx = createContext<ConsoleData | null>(null);
@@ -27,22 +29,21 @@ const Ctx = createContext<ConsoleData | null>(null);
 export function ConsoleDataProvider({ children }: { children: React.ReactNode }) {
   const data = useKillSwitch();
   const freeze = useFreeze(data.contracts?.agentWallet);
-  const { connect, connectors } = useConnect();
+  const wallet = useWalletConnection();
 
   const paused = freeze.paused ?? data.state?.paused ?? false;
 
   const toggleFreeze = useCallback(() => {
     if (!freeze.connected) {
-      const injected = connectors[0];
-      if (injected) connect({ connector: injected });
+      wallet.openWallet();
       return;
     }
     void (paused ? freeze.unfreeze() : freeze.freeze());
-  }, [freeze, paused, connect, connectors]);
+  }, [freeze, paused, wallet]);
 
   const value = useMemo(
-    () => ({ data, freeze, paused, toggleFreeze }),
-    [data, freeze, paused, toggleFreeze],
+    () => ({ data, freeze, paused, toggleFreeze, connectError: wallet.error }),
+    [data, freeze, paused, toggleFreeze, wallet.error],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

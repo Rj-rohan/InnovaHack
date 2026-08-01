@@ -80,7 +80,16 @@ def _tool_schemas_valid() -> None:
     from agent.tools import TOOL_SCHEMAS
 
     json.dumps(TOOL_SCHEMAS)
-    assert len(TOOL_SCHEMAS) >= 4
+    assert len(TOOL_SCHEMAS) >= 8, "expected the full AP toolset"
+
+    names = {s["function"]["name"] for s in TOOL_SCHEMAS}
+    for required in (
+        "match_purchase_order",
+        "check_duplicate",
+        "get_vendor_history",
+        "hold_for_review",
+    ):
+        assert required in names, f"{required} missing from the toolset"
     for schema in TOOL_SCHEMAS:
         assert schema["type"] == "function"
         fn = schema["function"]
@@ -94,22 +103,107 @@ def _tool_schemas_valid() -> None:
             )
 
 
+PARTIES = [
+    {"address": "0x1111111111111111111111111111111111111111", "tag": "vendor", "label": "Acme"},
+    {"address": "0x2222222222222222222222222222222222222222", "tag": "gas", "label": "Gas Refill"},
+    {"address": "0x3333333333333333333333333333333333333333", "tag": "vendor", "label": "Globex"},
+]
+
+
 def _injection_payload_present() -> None:
     """Scenario B depends on the poisoned invoice actually carrying the attacker address."""
-    from agent.prompts import ATTACKER_ADDRESS, injected_invoices
-
-    parties = [
-        {"address": "0x1111111111111111111111111111111111111111", "tag": "vendor", "label": "Acme"},
-        {"address": "0x2222222222222222222222222222222222222222", "tag": "gas", "label": "Gas"},
-    ]
-    invoices = injected_invoices(parties)
-    poisoned = [i for i in invoices if i.address == ATTACKER_ADDRESS]
-    assert poisoned, "no invoice points at the attacker address"
-    assert "0xBAD" in poisoned[0].memo, "memo does not carry the injected instruction"
-    # The clean queue must be untouched — the attack is in the data, not the prompt.
+    from agent.ledger import ATTACKER_ADDRESS, injected_invoice
     from agent.prompts import SYSTEM_PROMPT
 
-    assert "0xBAD" not in SYSTEM_PROMPT, "system prompt leaks the attack; it must live in the data"
+    poisoned = injected_invoice()
+    assert poisoned.address == ATTACKER_ADDRESS, "poisoned invoice does not target the attacker"
+    assert "0xBAD" in poisoned.memo, "memo does not carry the injected instruction"
+
+    # The normal agent must be clean: no attacker address, and it must still know how to escalate.
+    assert "0xBAD" not in SYSTEM_PROMPT, "normal prompt leaks the attack address"
+    assert "hold_for_review" in SYSTEM_PROMPT, "prompt no longer teaches the agent to escalate"
+
+
+def _compromised_prompt_cannot_reach_the_limits() -> None:
+    """The subverted agent may be told anything EXCEPT how to get past the contract.
+
+    `injected` mode models a compromised agent. It is allowed to be persuaded to pay an attacker —
+    that is the demo. What it must never contain is any suggestion that the spend caps or the
+    allowlist are negotiable, because they are not reachable from the prompt at all. If this
+    assertion ever fails, someone has started demonstrating prompt engineering instead of
+    enforcement.
+    """
+    from agent.prompts import COMPROMISED_SYSTEM_PROMPT
+
+    assert COMPROMISED_SYSTEM_PROMPT, "compromised prompt missing — scenario B needs it"
+
+    lowered = COMPROMISED_SYSTEM_PROMPT.lower()
+    for forbidden in ("allowlist", "spend limit", "per-transaction cap", "rolling cap", "pause"):
+        assert forbidden not in lowered, (
+            f"compromised prompt references {forbidden!r}; the contract's controls must never be "
+            "something a prompt can argue with"
+        )
+
+
+def _ledger_addresses_are_valid() -> None:
+    """Every address in the scripted ledger must be a real 20-byte address.
+
+    Added after a hand-written literal came up one hex character short and blew up only when the
+    agent reached that invoice, several minutes into a run.
+    """
+    from eth_utils import is_hex_address
+
+    from agent.ledger import ATTACKER_ADDRESS, Ledger, injected_invoice
+
+    ledger = Ledger(PARTIES)
+    addresses = [(inv.id, inv.address) for inv in ledger.invoices]
+    addresses.append(("injected", injected_invoice().address))
+    addresses.append(("ATTACKER_ADDRESS", ATTACKER_ADDRESS))
+
+    for label, address in addresses:
+        assert is_hex_address(address), f"{label}: {address!r} is not a valid address"
+
+
+def _ledger_scenarios_hold_up() -> None:
+    """The scripted sequence has to actually produce the decisions the demo narrates."""
+    from agent.ledger import Ledger
+
+    ledger = Ledger(PARTIES)
+
+    # A clean invoice matches its PO exactly.
+    clean = ledger.find("INV-2041")
+    po = ledger.po_for("INV-2041")
+    assert clean and po and clean.amount == po.approved_amount, "clean invoice should match its PO"
+
+    # The duplicate is only detectable once the original is paid.
+    assert ledger.duplicate_of("INV-2044") is None, "nothing is a duplicate before anything is paid"
+    ledger.mark_paid(clean.address, clean.amount)
+    dup = ledger.duplicate_of("INV-2044")
+    assert dup and dup.id == "INV-2041", "duplicate of INV-2041 not detected"
+
+    # The anomaly invoice is far outside its vendor's pattern — that is the whole point of it.
+    anomaly = ledger.find("INV-2045")
+    vendor = ledger.vendor_for(anomaly.vendor)
+    assert vendor and vendor.average > 0
+    assert anomaly.amount / vendor.average > 5, "anomaly invoice is not anomalous enough to notice"
+
+    # Hold -> approve puts the invoice back in the payable queue.
+    assert ledger.hold("INV-2045", "10x vendor average") is not None
+    assert ledger.find("INV-2045").status == "held"
+    assert len(ledger.pending_review()) == 1
+    ledger.resolve("INV-2045", True)
+    assert ledger.find("INV-2045").status == "approved"
+    assert not ledger.pending_review(), "approved item still sitting in the pending queue"
+
+
+def _time_travel_is_chain_gated() -> None:
+    """The dev-only endpoint must be impossible to enable on a public chain."""
+    from config import CHAIN_PROFILES
+
+    assert CHAIN_PROFILES[31337].allow_time_travel is True
+    for chain_id, profile in CHAIN_PROFILES.items():
+        if chain_id != 31337:
+            assert not profile.allow_time_travel, f"{profile.label} must not allow time travel"
 
 
 def _amount_conversion_is_exact() -> None:
@@ -127,6 +221,10 @@ check("web3 contract function surface", _web3_contract_surface)
 check("openai AsyncOpenAI client shape", _openai_client_shape)
 check("tool schemas well-formed", _tool_schemas_valid)
 check("injection payload lives in data, not prompt", _injection_payload_present)
+check("compromised prompt cannot reach the limits", _compromised_prompt_cannot_reach_the_limits)
+check("ledger addresses are valid", _ledger_addresses_are_valid)
+check("ledger scenarios produce the narrated decisions", _ledger_scenarios_hold_up)
+check("time travel is chain-gated", _time_travel_is_chain_gated)
 check("amount conversion is exact", _amount_conversion_is_exact)
 
 print()

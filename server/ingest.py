@@ -72,6 +72,15 @@ async def record_decision(
     )
 
 
+async def record_review(*, run_id: str, item: dict[str, Any]) -> None:
+    """Mirror a review-queue entry into Mongo so the owner's console can render it.
+
+    The queue itself is owned by this service; this is a read-model projection, which is why an
+    upsert on `invoiceId` is the right shape — the same item is written again on approve/reject.
+    """
+    await _post("/api/ingest/review", {"runId": run_id, **item})
+
+
 async def record_tx_attempt(
     *,
     run_id: str,

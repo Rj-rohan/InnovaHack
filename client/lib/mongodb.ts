@@ -10,7 +10,6 @@ import { MongoClient, type Db } from "mongodb";
  */
 
 declare global {
-  // eslint-disable-next-line no-var
   var _killSwitchMongo: Promise<MongoClient> | undefined;
 }
 

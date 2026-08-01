@@ -158,6 +158,16 @@ export function EstopCaption({
   isOwner: boolean;
   error: string | null;
 }) {
+  // Checked before the connected/idle branches: a wallet that refused to open reports through
+  // `error` while `status` is still "idle", and that message must not be swallowed.
+  if (error) {
+    return (
+      <p className="legend max-w-64 text-center text-estop" role="alert">
+        {error}
+      </p>
+    );
+  }
+
   if (!connected) {
     return <p className="legend text-placard/70">Hold to connect the owner wallet</p>;
   }
@@ -168,14 +178,6 @@ export function EstopCaption({
 
   if (status === "pending") {
     return <p className="legend text-hazard">Sending to Sepolia…</p>;
-  }
-
-  if (status === "error" && error) {
-    return (
-      <p className="legend text-estop" role="alert">
-        {error}
-      </p>
-    );
   }
 
   return (

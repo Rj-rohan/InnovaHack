@@ -25,10 +25,12 @@ export function Reveal({
     const node = ref.current;
     if (!node) return;
 
-    // No IntersectionObserver (or SSR hydration oddity) must never mean invisible content.
+    // No IntersectionObserver must never mean invisible content. Deferred to the next frame
+    // rather than set here: a synchronous setState in an effect body cascades a second render
+    // pass for every Reveal on the page, and there are a dozen of them.
     if (typeof IntersectionObserver === "undefined") {
-      setShown(true);
-      return;
+      const raf = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(raf);
     }
 
     const observer = new IntersectionObserver(

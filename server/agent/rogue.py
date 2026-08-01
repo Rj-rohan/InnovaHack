@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from chain.client import get_chain
+from chain.client import extract_policy_reason, get_chain
 from config import get_deployment, to_base_units
 from agent.prompts import ATTACKER_ADDRESS
 

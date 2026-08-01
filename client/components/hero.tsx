@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect } from "react";
-import { useConnect } from "wagmi";
+import { useCallback, useEffect, useRef } from "react";
+import { useWalletConnection } from "@/lib/use-wallet-connection";
 import { Estop, EstopCaption } from "@/components/estop";
 import { Gauge } from "@/components/gauge";
 import { LockoutTag } from "@/components/lockout-tag";
@@ -23,7 +22,32 @@ import { formatBlockNumber, shortenAddress } from "@/lib/format";
 export function Hero() {
   const data = useKillSwitch();
   const freeze = useFreeze(data.contracts?.agentWallet);
-  const { connect, connectors } = useConnect();
+  const wallet = useWalletConnection();
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Reduced motion holds the footage on its first frame rather than removing it. The frame is
+  // still the right backdrop; it is the movement the visitor asked not to have.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const apply = () => {
+      if (media.matches) {
+        video.pause();
+        video.currentTime = 0;
+      } else {
+        // Autoplay can be refused (low power mode, browser policy). Nothing breaks if it is —
+        // the first frame stays on screen and the wash still reads.
+        void video.play().catch(() => {});
+      }
+    };
+
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
 
   // The contract is the authority; the indexer is a cache of it. Prefer the direct read.
   const paused = freeze.paused ?? data.state?.paused ?? false;
@@ -33,13 +57,12 @@ export function Hero() {
   const armAndRun = useCallback(
     (run: () => void | Promise<void>) => () => {
       if (!freeze.connected) {
-        const injected = connectors[0];
-        if (injected) connect({ connector: injected });
+        wallet.openWallet();
         return;
       }
       void run();
     },
-    [freeze.connected, connect, connectors],
+    [freeze.connected, wallet],
   );
 
   // Drives the page-wide desaturation. A stopped machine loses its colour.
@@ -56,13 +79,19 @@ export function Hero() {
     <section className="relative isolate flex min-h-svh flex-col overflow-hidden">
       {/* --- Backplate. Treated until it reads as the same material as the chassis. --- */}
       <div className="hero-plate desat grain" aria-hidden="true">
-        <Image
-          src="/hero/plant.jpg"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover"
+        <video
+          ref={videoRef}
+          className="absolute inset-0 h-full w-full object-cover"
+          src="/hero/hero.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          // Decorative: the page says everything the footage does, so it is hidden from assistive
+          // tech and never carries information of its own.
+          aria-hidden="true"
+          tabIndex={-1}
+          preload="auto"
         />
         <div className="hero-wash" />
       </div>
@@ -172,7 +201,9 @@ export function Hero() {
             status={freeze.status}
             connected={freeze.connected}
             isOwner={freeze.isOwner}
-            error={freeze.error}
+            // A failed wallet open has to surface here too, or holding the switch with no
+            // extension installed looks like the switch itself is broken.
+            error={freeze.error ?? wallet.error}
           />
           {paused && <LockoutTag owner={freeze.owner ?? data.owner} />}
         </div>

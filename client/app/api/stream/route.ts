@@ -106,6 +106,7 @@ export async function GET(request: Request) {
       watch("policy_events", "policy", "createdAt");
       watch("chain_state", "state", "updatedAt");
       watch("decisions", "decision", "createdAt");
+      watch("review_items", "review", "updatedAt");
 
       // Proxies and load balancers drop idle connections; a comment line keeps it warm and is
       // ignored by the EventSource parser.

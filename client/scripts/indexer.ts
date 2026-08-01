@@ -8,8 +8,8 @@ import {
   type Log,
   type PublicClient,
 } from "viem";
-import { sepolia } from "viem/chains";
 import { BLOCK_REASONS, collections, ensureIndexes } from "../lib/collections";
+import { CHAIN_ID, getChainProfile, rpcUrl } from "../lib/chains";
 import { loadDeployment } from "../lib/deployment";
 import { getClient, getDb } from "../lib/mongodb";
 
@@ -31,20 +31,21 @@ import { getClient, getDb } from "../lib/mongodb";
  * flakiness and process restarts.
  */
 
-const POLL_MS = Number(process.env.INDEXER_POLL_MS ?? 6000);
-const MAX_BLOCK_RANGE = 800n; // free RPCs commonly cap getLogs ranges around 1k
-const CONFIRMATIONS = 1n;
+// Every chain-specific number comes from the profile, not from constants here. A 100k block range
+// and zero confirmations are right on a local node and would be rejected (or unsafe on reorg) on a
+// public one — which is exactly the kind of thing that silently breaks a later deployment.
+const profile = getChainProfile(CHAIN_ID);
+const POLL_MS = Number(process.env.INDEXER_POLL_MS ?? profile.pollMs);
+const MAX_BLOCK_RANGE = profile.maxBlockRange;
+const CONFIRMATIONS = profile.confirmations;
 
-const deployment = loadDeployment();
+const deployment = loadDeployment(CHAIN_ID);
 const walletAddress = deployment.contracts.agentWallet;
 const walletAbi = deployment.abi.agentWallet as Abi;
 
-const rpcUrl = process.env.SEPOLIA_RPC_URL;
-if (!rpcUrl) throw new Error("SEPOLIA_RPC_URL is not set (client/.env.local)");
-
 const publicClient: PublicClient = createPublicClient({
-  chain: sepolia,
-  transport: http(rpcUrl, { retryCount: 3, timeout: 20_000 }),
+  chain: profile.viemChain,
+  transport: http(rpcUrl(), { retryCount: 3, timeout: 20_000 }),
 });
 
 /** Maps a Solidity custom error name onto the same vocabulary `PaymentBlocked` uses. */

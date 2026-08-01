@@ -27,7 +27,11 @@ export interface DeploymentRecord {
   abi: { agentWallet: Abi; mockUsdc: Abi };
 }
 
-export const CHAIN_ID = Number(process.env.CHAIN_ID ?? 11155111);
+// Chain id and explorer links come from the profile registry — this module is only responsible
+// for reading the deployment record off disk.
+export { CHAIN_ID, explorerAddressUrl, explorerTxUrl } from "./chains";
+
+import { CHAIN_ID as ACTIVE_CHAIN_ID } from "./chains";
 
 function deploymentPath(chainId: number): string {
   // client/ and contracts/ are siblings under the repo root.
@@ -37,7 +41,9 @@ function deploymentPath(chainId: number): string {
 let cached: DeploymentRecord | null = null;
 
 /** Returns null when the contracts have not been deployed yet, so the UI can say so. */
-export function tryLoadDeployment(chainId: number = CHAIN_ID): DeploymentRecord | null {
+export function tryLoadDeployment(
+  chainId: number = ACTIVE_CHAIN_ID,
+): DeploymentRecord | null {
   if (cached && cached.chainId === chainId) return cached;
 
   const path = deploymentPath(chainId);
@@ -47,24 +53,14 @@ export function tryLoadDeployment(chainId: number = CHAIN_ID): DeploymentRecord 
   return cached;
 }
 
-export function loadDeployment(chainId: number = CHAIN_ID): DeploymentRecord {
+export function loadDeployment(chainId: number = ACTIVE_CHAIN_ID): DeploymentRecord {
   const record = tryLoadDeployment(chainId);
   if (!record) {
-    throw new Error(
-      `No deployment found for chain ${chainId}. Run: cd contracts && npm run deploy:sepolia`,
-    );
+    const how =
+      chainId === 31337
+        ? "npx hardhat node   (then, in another terminal)   npm run deploy:local"
+        : "npm run deploy:sepolia";
+    throw new Error(`No deployment found for chain ${chainId}. Run, in contracts/: ${how}`);
   }
   return record;
-}
-
-export function explorerTxUrl(txHash: string, chainId: number = CHAIN_ID): string {
-  const base =
-    chainId === 11155111 ? "https://sepolia.etherscan.io" : "https://etherscan.io";
-  return `${base}/tx/${txHash}`;
-}
-
-export function explorerAddressUrl(address: string, chainId: number = CHAIN_ID): string {
-  const base =
-    chainId === 11155111 ? "https://sepolia.etherscan.io" : "https://etherscan.io";
-  return `${base}/address/${address}`;
 }

@@ -1,4 +1,4 @@
-import type { Collection, Db } from "mongodb";
+import type { Db } from "mongodb";
 import { getDb } from "./mongodb";
 
 /**
@@ -7,20 +7,17 @@ import { getDb } from "./mongodb";
  * a wallet dashboard is not a cosmetic bug.
  */
 
-export type TxStatus = "pending" | "confirmed" | "reverted" | "blocked";
-export type AgentMode = "normal" | "injected" | "rogue";
+/**
+ * Re-exported from `./policy`, which is free of the MongoDB import. Client components must take
+ * runtime values from there directly — importing `BLOCK_REASONS` through this module pulls the
+ * driver into the browser bundle. Index 0 (`None`) never reaches the database.
+ */
+import type { AgentMode, BlockReason, TxStatus } from "./policy";
 
-/** Mirrors AgentWallet.BlockReason. Index 0 (`None`) never reaches the database. */
-export const BLOCK_REASONS = [
-  "None",
-  "Paused",
-  "SessionInvalid",
-  "CounterpartyNotAllowed",
-  "PerTxCapExceeded",
-  "RollingCapExceeded",
-  "InsufficientBalance",
-] as const;
-export type BlockReason = (typeof BLOCK_REASONS)[number];
+export { BLOCK_REASONS, REVIEW_STATUSES } from "./policy";
+export type { AgentMode, BlockReason, ReviewStatus, TxStatus } from "./policy";
+
+import type { ReviewStatus } from "./policy";
 
 export interface AgentRun {
   runId: string;
@@ -101,6 +98,26 @@ export interface ChainState {
   updatedAt: Date;
 }
 
+/**
+ * An invoice the agent declined to pay and referred to a human.
+ *
+ * Read model only: the queue is owned by the agent service, which upserts each item here on
+ * creation and again on approve/reject. The console renders from this and sends owner decisions
+ * back to the agent service, not to Mongo.
+ */
+export interface ReviewItem {
+  runId: string;
+  invoiceId: string;
+  vendor: string;
+  address: string;
+  amount: string;
+  /** The agent's plain-language explanation, written for a human to act on. */
+  reason: string;
+  status: ReviewStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export async function collections(db?: Db) {
   const database = db ?? (await getDb());
   return {
@@ -109,6 +126,7 @@ export async function collections(db?: Db) {
     txAttempts: database.collection<TxAttempt>("tx_attempts"),
     policyEvents: database.collection<PolicyEvent>("policy_events"),
     chainState: database.collection<ChainState>("chain_state"),
+    reviewItems: database.collection<ReviewItem>("review_items"),
   };
 }
 
@@ -140,6 +158,10 @@ export async function ensureIndexes(db?: Db): Promise<void> {
   await c.decisions.createIndex({ createdAt: -1 });
 
   await c.runs.createIndex({ runId: 1 }, { unique: true });
+
+  // Unique on invoiceId: the agent upserts the same item on hold and again on approve/reject.
+  await c.reviewItems.createIndex({ invoiceId: 1 }, { unique: true });
+  await c.reviewItems.createIndex({ status: 1, createdAt: -1 });
 }
 
 export type CollectionName =
@@ -147,4 +169,5 @@ export type CollectionName =
   | "decisions"
   | "tx_attempts"
   | "policy_events"
-  | "chain_state";
+  | "chain_state"
+  | "review_items";

@@ -6,6 +6,7 @@ import type {
   ChainState,
   Decision,
   PolicyEvent,
+  ReviewItem,
   TxAttempt,
 } from "./collections";
 
@@ -30,6 +31,8 @@ export interface KillSwitchData {
   attempts: TxAttempt[];
   events: PolicyEvent[];
   decisions: Decision[];
+  /** Invoices the agent referred to a human. A soft control — the contract is the hard one. */
+  reviewItems: ReviewItem[];
   allowlist: AllowlistEntry[];
   /** True when the indexer has not written recently — surface it, don't hide it. */
   indexerStale: boolean;
@@ -61,6 +64,7 @@ export function useKillSwitch(): KillSwitchData {
   const [attempts, setAttempts] = useState<TxAttempt[]>([]);
   const [events, setEvents] = useState<PolicyEvent[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [indexerStale, setIndexerStale] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
@@ -95,6 +99,7 @@ export function useKillSwitch(): KillSwitchData {
         setAttempts(payload.attempts ?? []);
         setEvents(payload.events ?? []);
         setDecisions(payload.decisions ?? []);
+        setReviewItems(payload.reviewItems ?? []);
         setIndexerStale(payload.indexerHealthy === false);
       } catch {
         if (!cancelled) setNotice("Could not reach /api/state");
@@ -146,6 +151,11 @@ export function useKillSwitch(): KillSwitchData {
       setDecisions((rows) => upsert(rows, doc, (a, b) => a.runId === b.runId && a.tick === b.tick));
     });
 
+    source.addEventListener("review", (event) => {
+      const doc = JSON.parse((event as MessageEvent).data) as ReviewItem;
+      setReviewItems((rows) => upsert(rows, doc, (a, b) => a.invoiceId === b.invoiceId));
+    });
+
     source.addEventListener("state", (event) => {
       const doc = JSON.parse((event as MessageEvent).data) as ChainState;
       setState(doc);
@@ -185,6 +195,7 @@ export function useKillSwitch(): KillSwitchData {
     attempts,
     events,
     decisions,
+    reviewItems,
     allowlist: state?.allowlist ?? [],
     indexerStale,
     notice,

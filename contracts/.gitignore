@@ -14,6 +14,6 @@
 .env.*
 !.env.example
 
-# Local simulated-chain deploy records. The Sepolia one (11155111.json) IS committed on
-# purpose — client/ and server/ read addresses and ABIs from it.
-/deployments/31337.json
+# Deployment records ARE committed — client/ and server/ read addresses and ABIs from them,
+# and 31337.json is what a fresh clone needs to run the local demo without redeploying.
+
