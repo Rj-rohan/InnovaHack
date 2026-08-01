@@ -23,6 +23,8 @@ export interface KillSwitchData {
   chainId: number | null;
   contracts: { agentWallet: `0x${string}`; mockUsdc: `0x${string}` } | null;
   owner: `0x${string}` | null;
+  /** The key the agent signs with. The console needs it to offer a revoke. */
+  agentSessionKey: `0x${string}` | null;
   counterparties: { address: `0x${string}`; tag: string; label: string }[];
   state: ChainState | null;
   attempts: TxAttempt[];
@@ -53,6 +55,7 @@ export function useKillSwitch(): KillSwitchData {
   const [chainId, setChainId] = useState<number | null>(null);
   const [contracts, setContracts] = useState<KillSwitchData["contracts"]>(null);
   const [owner, setOwner] = useState<`0x${string}` | null>(null);
+  const [agentSessionKey, setAgentSessionKey] = useState<`0x${string}` | null>(null);
   const [counterparties, setCounterparties] = useState<KillSwitchData["counterparties"]>([]);
   const [state, setState] = useState<ChainState | null>(null);
   const [attempts, setAttempts] = useState<TxAttempt[]>([]);
@@ -86,6 +89,7 @@ export function useKillSwitch(): KillSwitchData {
         setChainId(payload.chainId ?? null);
         setContracts(payload.contracts ?? null);
         setOwner(payload.owner ?? null);
+        setAgentSessionKey(payload.agentSessionKey ?? null);
         setCounterparties(payload.counterparties ?? []);
         setState(payload.state ?? null);
         setAttempts(payload.attempts ?? []);
@@ -175,6 +179,7 @@ export function useKillSwitch(): KillSwitchData {
     chainId,
     contracts,
     owner,
+    agentSessionKey,
     counterparties,
     state,
     attempts,

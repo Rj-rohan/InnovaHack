@@ -23,6 +23,59 @@ export function formatUsdc(value: string | bigint): string {
   return `${formatUnits6(value)} mUSDC`;
 }
 
+/**
+ * Full precision, trailing zeros kept: `38.000000`, never `38`.
+ *
+ * Used in the monospace placard tables where amounts sit in a column and have to align on the
+ * decimal point. It is also the honest rendering on a page about spend limits — a reader who
+ * sees `38` is left wondering what got rounded away.
+ */
+export function formatFixed6(value: string | bigint): string {
+  const raw = typeof value === "bigint" ? value : BigInt(value || "0");
+  const negative = raw < 0n;
+  const abs = negative ? -raw : raw;
+
+  const base = 10n ** BigInt(DECIMALS);
+  const whole = (abs / base).toLocaleString("en-US");
+  const fraction = (abs % base).toString().padStart(DECIMALS, "0");
+
+  return `${negative ? "-" : ""}${whole}.${fraction}`;
+}
+
+/** Percentage of a cap consumed, clamped to 100. Both arguments are base-unit strings. */
+export function percentOf(part: string | bigint, whole: string | bigint): number {
+  const p = typeof part === "bigint" ? part : BigInt(part || "0");
+  const w = typeof whole === "bigint" ? whole : BigInt(whole || "0");
+  if (w <= 0n) return 0;
+  return Math.min(100, Number((p * 10000n) / w) / 100);
+}
+
+/**
+ * Coarse on purpose. A countdown that changes every second gets re-announced every second by a
+ * screen reader, and none of those announcements carry information the last one did not.
+ */
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0) return "expired";
+
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+}
+
+/** Block numbers are long enough that grouping is the difference between reading and counting. */
+export function formatBlockNumber(block: string | bigint | number): string {
+  try {
+    return BigInt(block).toLocaleString("en-US");
+  } catch {
+    return String(block);
+  }
+}
+
 export function shortenAddress(address: string): string {
   if (!address || address.length < 10) return address;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;

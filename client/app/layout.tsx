@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Providers } from "./providers";
 import "./globals.css";
 
 // Display. The `wdth` axis (62–125) is the whole reason this face was chosen: set wide, Archivo
@@ -51,7 +52,9 @@ export default function RootLayout({
       lang="en"
       className={`${archivo.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="m-chassis flex min-h-full flex-col">{children}</body>
+      <body className="m-chassis flex min-h-full flex-col">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

@@ -26,6 +26,19 @@
   --color-estop-lo: #9e241e; /* button shoulder / pressed state */
   --color-running: #74a08a; /* normal operation, muted on purpose */
 
+  /* Darkened counterparts for type ON the cream placard. The chassis tones above are tuned for
+     a dark background and drop to ~2:1 on cream, which is unreadable. Hazard has no readable
+     form on cream at all, so caution rows use ink plus a yellow marker instead of yellow text. */
+  --color-running-ink: #3f6b55;
+  --color-estop-ink: #a32820;
+
+  /* Aliases for components written against shadcn's token names. Mapped onto the industrial
+     palette rather than installing shadcn, which would rewrite this file with a second, competing
+     set of colours and radii. */
+  --color-background: var(--color-enamel);
+  --color-foreground: var(--color-placard);
+  --color-border: rgb(232 228 217 / 0.14);
+
   /* --- Type. Three roles: stamped signage, engineering body, aligned data. */
   --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
@@ -43,7 +56,7 @@
   --text-panel: 2rem;
   --text-panel--line-height: 1.05;
   --text-panel--letter-spacing: -0.01em;
-  --text-display: clamp(3.25rem, 11vw, 9rem);
+  --text-display: clamp(3rem, 8.4vw, 7rem);
   --text-display--line-height: 0.86;
   --text-display--letter-spacing: -0.02em;
 
@@ -55,10 +68,11 @@
   --shadow-inset: inset 0 1px 3px rgb(0 0 0 / 0.5), inset 0 -1px 0 rgb(232 228 217 / 0.05);
 }
 
-/* Smooth transitions on the E-stop's conic ring need a typed custom property. */
+/* The E-stop's conic ring can only animate if the property is typed. It inherits so the value can
+   be set on the button and read by the ring element inside it. */
 @property --estop-fill {
   syntax: "<percentage>";
-  inherits: false;
+  inherits: true;
   initial-value: 0%;
 }
 
@@ -217,6 +231,149 @@ body {
 }
 
 /* ===========================================================================
+   The E-stop
+
+   A mushroom head in a machined collar. The collar doubles as the hold
+   progress ring — filling hazard yellow, because arming the switch is exactly
+   a caution state. The red is spent here and almost nowhere else.
+   =========================================================================== */
+
+.estop {
+  --estop-size: clamp(9rem, 22vw, 13rem);
+  --estop-hold: 600ms;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--estop-size);
+  height: var(--estop-size);
+  border-radius: 9999px;
+  flex: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  touch-action: none; /* a hold must not turn into a scroll gesture */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.estop[data-variant="bar"] {
+  --estop-size: 2.75rem;
+}
+
+/* Only ever disabled while a transaction is in flight. Being disconnected must NOT grey the
+   switch out — it is the first thing a visitor sees, and a translucent kill switch is a broken
+   promise. Holding it while disconnected opens the wallet instead. */
+.estop:disabled {
+  cursor: wait;
+}
+
+/* The switch is bolted to something. Without a mount it floats on the photograph and stops
+   reading as hardware. */
+.estop-mount {
+  border-radius: 9999px;
+  padding: clamp(1rem, 2.2vw, 1.6rem);
+  background: radial-gradient(circle at 50% 30%, rgb(59 69 65 / 0.95) 0%, rgb(24 30 28 / 0.98) 78%);
+  box-shadow:
+    inset 0 1px 0 rgb(232 228 217 / 0.1),
+    inset 0 -2px 8px rgb(0 0 0 / 0.6),
+    0 18px 50px rgb(0 0 0 / 0.55);
+}
+
+/* Collar, doubling as the hold progress ring. */
+.estop-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background:
+    conic-gradient(var(--color-hazard) var(--estop-fill), transparent 0),
+    radial-gradient(circle at 50% 30%, #4a5450 0%, #262c2a 70%);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.6),
+    0 10px 30px rgb(0 0 0 / 0.45);
+  transition: --estop-fill 140ms linear;
+}
+
+.estop[data-holding="true"] .estop-ring {
+  transition-duration: var(--estop-hold);
+}
+
+.estop-shoulder {
+  position: absolute;
+  inset: 9%;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 25%, #2f3634 0%, #1a201e 100%);
+  box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.7);
+}
+
+/* The mushroom head. */
+.estop-cap {
+  position: absolute;
+  inset: 8%;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(
+    circle at 50% 22%,
+    #e8574c 0%,
+    var(--color-estop) 45%,
+    var(--color-estop-lo) 100%
+  );
+  box-shadow:
+    inset 0 -3px 10px rgb(0 0 0 / 0.45),
+    inset 0 2px 3px rgb(255 255 255 / 0.25),
+    0 6px 0 var(--color-estop-lo),
+    0 12px 22px rgb(0 0 0 / 0.5);
+  transform: translateY(-3px);
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
+}
+
+/* Seated — the thunk. Same visual while held and while frozen, because in both cases the
+   switch is physically down. */
+.estop[data-holding="true"] .estop-cap,
+.estop[data-paused="true"] .estop-cap {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 -2px 8px rgb(0 0 0 / 0.55),
+    inset 0 3px 8px rgb(0 0 0 / 0.4),
+    0 1px 0 var(--color-estop-lo),
+    0 4px 12px rgb(0 0 0 / 0.45);
+}
+
+.estop-cap-text {
+  color: rgb(255 255 255 / 0.92);
+  font-size: calc(var(--estop-size) * 0.11);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+  user-select: none;
+}
+
+.estop[data-variant="bar"] .estop-cap-text {
+  /* At 44px the word is illegible; the shape carries the meaning, aria-label carries the rest. */
+  display: none;
+}
+
+.estop[data-busy="true"] .estop-ring {
+  animation: estop-wait 1.1s ease-in-out infinite;
+}
+
+@keyframes estop-wait {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.6),
+      0 0 0 0 rgb(242 183 5 / 0.45);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.6),
+      0 0 0 8px rgb(242 183 5 / 0);
+  }
+}
+
+/* ===========================================================================
    Hero plate — the photograph is treated until it reads as the same material
    as the chassis, rather than as a photo sitting behind a UI.
    =========================================================================== */
@@ -231,9 +388,11 @@ body {
     linear-gradient(200deg, var(--color-enamel-hi) 0%, var(--color-enamel) 45%, var(--color-iron) 100%);
 }
 
+/* Held well down. The photograph is atmosphere — the moment it competes with the type or the
+   switch, it has stopped doing its job. */
 .hero-plate img {
   mix-blend-mode: luminosity;
-  opacity: 0.5;
+  opacity: 0.26;
   transform-origin: 60% 40%;
   animation: plate-drift 40s ease-in-out infinite alternate;
 }
@@ -244,8 +403,13 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(115% 85% at 65% 35%, transparent 0%, rgb(31 37 35 / 0.55) 70%, var(--color-iron) 100%),
-    linear-gradient(180deg, transparent 55%, var(--color-enamel) 100%),
+    radial-gradient(
+      110% 80% at 62% 38%,
+      rgb(49 58 54 / 0.35) 0%,
+      rgb(31 37 35 / 0.82) 62%,
+      var(--color-iron) 100%
+    ),
+    linear-gradient(180deg, rgb(31 37 35 / 0.55) 0%, transparent 30%, var(--color-enamel) 100%),
     linear-gradient(0deg, rgb(242 183 5 / 0.08), rgb(242 183 5 / 0.08));
 }
 
@@ -285,6 +449,92 @@ body {
   }
   100% {
     transform: translate3d(0, 0, 0);
+  }
+}
+
+/* A miniature of the E-stop, used as the wordmark on the access screen. Not a button — it never
+   responds to a pointer, so it is drawn rather than built from the real component. */
+.sign-in-mark {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle at 50% 30%, #e8574c 0%, var(--color-estop) 48%, var(--color-estop-lo) 100%)
+      content-box,
+    radial-gradient(circle at 50% 30%, #3b4541 0%, #1a201e 100%) padding-box;
+  padding: 0.5rem;
+  box-shadow:
+    inset 0 1px 0 rgb(232 228 217 / 0.12),
+    0 6px 18px rgb(0 0 0 / 0.5);
+}
+
+/* ===========================================================================
+   Orbiting stack
+
+   Rings are engraved circles, not glowing outlines, and the marks ride them in
+   machined bezels. Keyframes live here rather than in a <style> tag inside the
+   component so the whole motion system stays in one file.
+   =========================================================================== */
+
+.orbit-ring {
+  border: 1px solid rgb(232 228 217 / 0.16);
+  box-shadow:
+    0 1px 0 rgb(0 0 0 / 0.4),
+    inset 0 1px 0 rgb(0 0 0 / 0.25);
+}
+
+.orbit-bezel {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  color: var(--color-placard);
+  background: radial-gradient(circle at 50% 28%, #4a5450 0%, #262c2a 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(232 228 217 / 0.18),
+    inset 0 -2px 5px rgb(0 0 0 / 0.55),
+    0 8px 20px rgb(0 0 0 / 0.5);
+}
+
+/* Soften the outer edge so the widest ring does not end on a hard line against the section. */
+.orbit-stage {
+  mask-image: radial-gradient(circle at 50% 50%, #000 62%, transparent 96%);
+}
+
+@keyframes orbit-cw {
+  from {
+    transform: rotate(var(--start-angle));
+  }
+  to {
+    transform: rotate(calc(var(--start-angle) + 360deg));
+  }
+}
+
+@keyframes orbit-ccw {
+  from {
+    transform: rotate(var(--start-angle));
+  }
+  to {
+    transform: rotate(calc(var(--start-angle) - 360deg));
+  }
+}
+
+@keyframes counter-cw {
+  from {
+    transform: rotate(var(--counter-offset, 0deg));
+  }
+  to {
+    transform: rotate(calc(var(--counter-offset, 0deg) - 360deg));
+  }
+}
+
+@keyframes counter-ccw {
+  from {
+    transform: rotate(var(--counter-offset, 0deg));
+  }
+  to {
+    transform: rotate(calc(var(--counter-offset, 0deg) + 360deg));
   }
 }
 
@@ -393,6 +643,12 @@ html[data-frozen="true"] .desat {
   .stamp {
     animation-duration: 1ms;
     animation-delay: 0ms !important;
+  }
+
+  /* The orbits stop where they are. The diagram still reads — the rings and marks are the
+     information, the rotation was only ever atmosphere. */
+  .orbit-stage * {
+    animation: none !important;
   }
 
   .reveal {

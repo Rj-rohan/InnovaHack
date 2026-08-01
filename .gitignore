@@ -19,3 +19,4 @@ cache/
 # Editor / OS
 .DS_Store
 *.log
+.claude/settings.local.json
