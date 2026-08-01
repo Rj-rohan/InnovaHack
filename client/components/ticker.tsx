@@ -1,7 +1,7 @@
 "use client";
 
 import type { TxAttempt } from "@/lib/collections";
-import { explainReason, formatFixed6, shortenAddress, shortenHash, timeAgo } from "@/lib/format";
+import { explainReason, formatFixed2, shortenAddress, shortenHash, timeAgo } from "@/lib/format";
 
 /**
  * Payment attempts, on the placard.
@@ -63,7 +63,7 @@ export function Ticker({
                 <span className="legend">{status.label}</span>
               </span>
 
-              <span className="tnum font-mono text-body font-medium">{formatFixed6(row.amount)}</span>
+              <span className="tnum font-mono text-body font-medium">{formatFixed2(row.amount)}</span>
 
               <span className="min-w-0 flex-1 truncate text-body">
                 {row.vendor ?? <span className="font-mono">{shortenAddress(row.to)}</span>}

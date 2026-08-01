@@ -1,6 +1,7 @@
 "use client";
 
 import { Shell } from "@/components/layout";
+import { SectionHeader } from "@/components/section-header";
 import { ScrollStage } from "@/components/scroll-stage";
 
 /**
@@ -31,10 +32,11 @@ export function StorageContrast() {
       }}
     >
       <Shell>
-        <p className="legend text-placard/55">The whole argument</p>
-        <h2 className="heading mt-3 max-w-[20ch] text-panel text-placard">
-          The difference is where the rule is written
-        </h2>
+        <SectionHeader
+          eyebrow="The whole argument"
+          title="The difference is where the rule is written"
+          lede="One of these is a rule the agent has to choose to follow. The other is a rule it cannot reach. Only the second survives the agent being compromised."
+        />
       </Shell>
 
       <Shell className="mt-12">

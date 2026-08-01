@@ -21,7 +21,10 @@
   --color-placard-lo: #d8d3c4; /* placard edge / secondary rows */
   --color-ink: #23282a; /* deep-cut type on placard */
   --color-ink-soft: #5d6663; /* secondary type on placard */
-  --color-hazard: #f2b705; /* ISO safety yellow — caution states only */
+  /* ISO safety yellow. Caution states — throttled, near-cap, session expiring — and, by
+     deliberate exception, the single primary CTA per section. That exception only stays honest
+     while primaries are rationed; see the Button primitive, which is what enforces it. */
+  --color-hazard: #f2b705;
   --color-estop: #d0342c; /* E-stop red — the button, blocked, paused */
   --color-estop-lo: #9e241e; /* button shoulder / pressed state */
   --color-running: #74a08a; /* normal operation, muted on purpose */
@@ -53,6 +56,10 @@
   --text-body--line-height: 1.6;
   --text-lead: 1.25rem;
   --text-lead--line-height: 1.5;
+  /* Sub-headings. Without this every h3 fell back to --text-lead, which is body-adjacent, and
+     page sub-structure read flat. One tier is enough — the gap above it is still deliberate. */
+  --text-subhead: 1.5rem;
+  --text-subhead--line-height: 1.15;
   --text-panel: 2rem;
   --text-panel--line-height: 1.05;
   --text-panel--letter-spacing: -0.01em;
@@ -99,17 +106,18 @@ body {
   color: var(--color-ink);
 }
 
-/* Reading measure. Sections span the full frame; the prose inside them does not. 62ch is the
-   upper end of comfortable — past it the eye loses the start of the next line. */
+/* Reading measure. Sections span the full frame; the prose inside them does not. Past roughly
+   75ch the eye starts losing the start of the next line, so this is near the ceiling. */
 .measure {
-  max-width: 62ch;
+  max-width: 70ch;
 }
 
-/* Bleed sections can push past the viewport on narrow screens if a child overflows. Catch it at
-   the root rather than hunting the offender at 375px. */
-html {
-  overflow-x: hidden;
-}
+/* NOTE: there is deliberately no `html { overflow-x: hidden }` here.
+   Setting overflow on either axis of `html` forces the other axis to `auto`, which turns the root
+   into a scroll container — ScrollTrigger then measures against a scroller that never matches the
+   document and every scroll-linked animation silently stops firing. Contain overflow at the
+   section that causes it instead; `overflow-x: clip` is the safe tool, since it clips without
+   creating a scroll container. */
 
 /* Amounts, addresses and block numbers must never reflow between polls. */
 .tnum {
@@ -579,17 +587,27 @@ html {
 }
 
 /* ===========================================================================
-   Load sequence — relays closing. Hard cuts, no fades.
+   State feedback — the switch seating, the lockout tag stamping.
+
+   Page entrance is NOT here: it moved to a single GSAP timeline in hero.tsx.
+   The previous CSS version ran `1ms steps(1, end)` at seven staggered delays,
+   which is a binary flip rather than a transition and read as seven flashes.
    =========================================================================== */
 
-.relay {
-  animation: relay-cut 1ms steps(1, end) both;
+/* Page entrance for content that is already on screen at load.
+
+   Pure CSS on purpose: `Reveal` waits on an IntersectionObserver, and gating above-the-fold
+   content on an observer means a slow or failed callback leaves the page blank. A dashboard that
+   might render empty is a worse trade than a slightly less clever entrance. `Reveal` stays for
+   genuinely below-the-fold content, where waiting is the whole point. */
+.settle {
+  animation: settle-in 420ms cubic-bezier(0.22, 0.85, 0.3, 1) both;
 }
 
-@keyframes relay-cut {
+@keyframes settle-in {
   from {
     opacity: 0;
-    transform: translateX(-0.06em);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -678,7 +696,7 @@ html[data-frozen="true"] .desat {
     animation: none;
   }
 
-  .relay,
+  .settle,
   .seat,
   .stamp {
     animation-duration: 1ms;

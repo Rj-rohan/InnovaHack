@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "indexer": "tsx --env-file=.env.local scripts/indexer.ts",
     "db:init": "tsx --env-file=.env.local scripts/db-init.ts",
-    "sync:chain": "node scripts/sync-chain.mjs"
+    "sync:chain": "node scripts/sync-chain.mjs",
+    "db:reset": "tsx --env-file=.env.local scripts/db-reset.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

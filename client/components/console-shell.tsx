@@ -154,7 +154,14 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="desat flex-1 px-5 py-8 lg:px-8 lg:py-10">{children}</main>
+        {/* Keyed on the route so the settle replays on navigation. One entrance per page and then
+            nothing — a dashboard whose figures keep moving while you read them is hostile, so the
+            console gets this and none of the scroll-scrubbed motion the landing page uses. */}
+        <main className="desat flex-1 px-5 py-8 lg:px-8 lg:py-10">
+          <div key={pathname} className="settle">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );

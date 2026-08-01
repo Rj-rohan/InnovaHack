@@ -2,7 +2,7 @@
 
 import { Gauge } from "@/components/gauge";
 import type { KillSwitchData } from "@/lib/use-kill-switch";
-import { formatFixed6, shortenAddress } from "@/lib/format";
+import { formatFixed2, shortenAddress } from "@/lib/format";
 
 /**
  * The readings, beside the switch.
@@ -54,8 +54,8 @@ export function InstrumentRail({ data, paused }: { data: KillSwitchData; paused:
       <hr className="rule-engraved my-5" />
 
       <dl className="flex flex-col gap-2.5">
-        <Reading label="Per transaction" value={formatFixed6(state.perTxCap)} />
-        <Reading label="Balance" value={formatFixed6(state.balance)} />
+        <Reading label="Per transaction" value={formatFixed2(state.perTxCap)} />
+        <Reading label="Balance" value={formatFixed2(state.balance)} />
         <Reading label="Payable parties" value={`${payable} of ${state.allowlist.length}`} />
         {data.agentSessionKey && (
           <Reading label="Agent key" value={shortenAddress(data.agentSessionKey)} />

@@ -34,7 +34,7 @@ export function ScrollStage({
   scrub = 1,
   start = "top top",
   end = "+=180%",
-  media = "(min-width: 1024px)",
+  media = "(min-width: 640px)",
   className = "",
   id,
 }: {
@@ -47,8 +47,11 @@ export function ScrollStage({
   start?: string;
   end?: string;
   /**
-   * Extra gate on top of reduced-motion. Pinned stages need vertical room they do not have on a
-   * phone, where pinning a section taller than the viewport traps the reader.
+   * Extra gate on top of reduced-motion.
+   *
+   * Was 1024px when stages pinned — a pinned section taller than the viewport traps the reader on
+   * a phone. Nothing pins now, so the gate only needs to keep horizontal drift from fighting the
+   * scroll on the narrowest screens.
    */
   media?: string;
   className?: string;

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Reveal } from "@/components/reveal";
+import { SectionHeader } from "@/components/section-header";
+import { ButtonLink } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "How enforcement works",
@@ -158,19 +160,12 @@ export default function HowItWorksPage() {
               transaction to Etherscan, and the contract is verified.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Link
-                href="/demo"
-                className="legend px-5 py-3 text-ink transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "var(--color-hazard)" }}
-              >
+              <ButtonLink href="/demo" variant="primary">
                 Watch it refuse something
-              </Link>
-              <Link
-                href="/console"
-                className="legend m-panel px-5 py-3 text-placard transition-colors hover:bg-enamel-lo"
-              >
+              </ButtonLink>
+              <ButtonLink href="/console" variant="secondary">
                 Open the console
-              </Link>
+              </ButtonLink>
             </div>
           </div>
         </Reveal>
@@ -189,11 +184,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <p className="legend text-placard/50">{eyebrow}</p>
-      <h2 className="heading mt-3 max-w-[24ch] text-panel text-placard">{title}</h2>
-      <div className="measure mt-5 flex flex-col gap-4 text-body text-placard/70">{children}</div>
-    </section>
+    <SectionHeader eyebrow={eyebrow} title={title}>
+      <div className="flex flex-col gap-4 text-body text-placard/70">{children}</div>
+    </SectionHeader>
   );
 }
 

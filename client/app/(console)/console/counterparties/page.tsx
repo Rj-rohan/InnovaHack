@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { isAddress, stringToHex } from "viem";
 import { useConsole } from "@/components/console-data";
 import { OwnerNotice, WriteStatus } from "@/components/write-status";
+import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
 import { useOwnerWrite } from "@/lib/use-owner-write";
 
@@ -213,14 +214,9 @@ export default function CounterpartiesPage() {
           )}
 
           <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="submit"
-              disabled={!canWrite || busy}
-              className="legend px-5 py-3 text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-              style={{ backgroundColor: "var(--color-hazard)" }}
-            >
+            <Button type="submit" variant="primary" disabled={!canWrite || busy}>
               Add counterparty
-            </button>
+            </Button>
             {(write.pendingKey === "add" || write.pendingKey?.startsWith("rm:")) && (
               <WriteStatus
                 status={write.status}

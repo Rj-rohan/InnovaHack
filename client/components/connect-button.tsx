@@ -1,9 +1,10 @@
 "use client";
 
 import { useChainId, useDisconnect, useSwitchChain } from "wagmi";
-import { sepolia } from "wagmi/chains";
 import { shortenAddress } from "@/lib/format";
 import { useWalletConnection } from "@/lib/use-wallet-connection";
+import { Button } from "@/components/ui/button";
+import { CHAIN_ID } from "@/lib/chains";
 
 /**
  * Wallet connection for the owner.
@@ -20,16 +21,11 @@ export function ConnectButton({ className = "" }: { className?: string }) {
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
-  if (isConnected && chainId !== sepolia.id) {
+  if (isConnected && chainId !== CHAIN_ID) {
     return (
-      <button
-        type="button"
-        className={`legend px-3 py-2 text-ink transition-opacity hover:opacity-90 ${className}`}
-        style={{ backgroundColor: "var(--color-hazard)" }}
-        onClick={() => switchChain({ chainId: sepolia.id })}
-      >
-        Switch to Sepolia
-      </button>
+      <Button variant="primary" size="sm" className={className} onClick={() => switchChain({ chainId: CHAIN_ID })}>
+        Switch network
+      </Button>
     );
   }
 

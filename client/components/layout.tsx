@@ -62,37 +62,3 @@ export function Section({
     </section>
   );
 }
-
-/**
- * Eyebrow → heading → lede, in that order, everywhere.
- *
- * The eyebrow moves into its own gutter column above `xl`: at full width a label sitting directly
- * on top of a heading wastes the horizontal space that just became available.
- */
-export function SectionHeader({
-  eyebrow,
-  title,
-  lede,
-  children,
-}: {
-  eyebrow?: string;
-  title: React.ReactNode;
-  lede?: React.ReactNode;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-x-12 gap-y-4 xl:grid-cols-[12rem_minmax(0,1fr)]">
-      {eyebrow ? (
-        <p className="legend pt-1.5 text-placard/55">{eyebrow}</p>
-      ) : (
-        <span className="hidden xl:block" aria-hidden="true" />
-      )}
-
-      <div>
-        <h2 className="heading max-w-[24ch] text-panel text-placard">{title}</h2>
-        {lede && <p className="measure mt-4 text-body text-placard/65">{lede}</p>}
-        {children}
-      </div>
-    </div>
-  );
-}

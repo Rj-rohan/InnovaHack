@@ -1,6 +1,6 @@
 "use client";
 
-import { formatFixed6, percentOf } from "@/lib/format";
+import { formatFixed2, percentOf } from "@/lib/format";
 
 /**
  * The rolling 24-hour window.
@@ -31,8 +31,8 @@ export function Gauge({
       <div className="flex items-baseline justify-between gap-3">
         <p className="legend text-placard/70">{label}</p>
         <p className="tnum font-mono text-body">
-          <span className={exhausted ? "text-estop" : undefined}>{formatFixed6(spent)}</span>
-          <span className="text-placard/45"> / {formatFixed6(cap)}</span>
+          <span className={exhausted ? "text-estop" : undefined}>{formatFixed2(spent)}</span>
+          <span className="text-placard/45"> / {formatFixed2(cap)}</span>
         </p>
       </div>
 

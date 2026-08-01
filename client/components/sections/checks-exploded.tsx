@@ -1,6 +1,7 @@
 "use client";
 
 import { Shell } from "@/components/layout";
+import { SectionHeader } from "@/components/section-header";
 import { ScrollStage } from "@/components/scroll-stage";
 
 /**
@@ -116,16 +117,18 @@ export function ChecksExploded() {
     >
       <div className="flex flex-col justify-center py-20 lg:py-28">
         <Shell>
-          <p className="legend text-placard/55">Evaluated in this order, every time</p>
-          <h2 className="heading mt-3 max-w-[22ch] text-panel text-placard">
-            Six questions the contract asks before it moves a cent
-          </h2>
-          <p className="measure mt-4 text-body text-placard/65">
-            The order is not presentation. It is the order{" "}
-            <span className="font-mono text-placard/85">_check()</span> runs in — cheapest and most
-            severe first — so when a payment breaks several rules at once, the reason you see is the
-            highest one here.
-          </p>
+          <SectionHeader
+            eyebrow="Evaluated in this order, every time"
+            title="Six questions the contract asks before it moves a cent"
+            lede={
+              <>
+                The order is not presentation. It is the order{" "}
+                <span className="font-mono text-placard/85">_check()</span> runs in — cheapest and
+                most severe first — so when a payment breaks several rules at once, the reason you
+                see is the highest one here.
+              </>
+            }
+          />
 
           {/* `perspective` on the container is what makes the fan-in read as depth rather than
               as a flat slide. */}
@@ -155,7 +158,7 @@ export function ChecksExploded() {
                   )}
                 </span>
 
-                <h3 className="text-lead text-placard">{rule.check}</h3>
+                <h3 className="heading text-subhead text-placard">{rule.check}</h3>
 
                 <p className="col-start-2 text-body text-placard/60 lg:col-start-3">
                   {rule.detail}

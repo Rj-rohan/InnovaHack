@@ -156,11 +156,33 @@ async def list_review() -> dict[str, Any]:
     return {"items": loop.review_queue()}
 
 
+def _no_such_item(invoice_id: str) -> HTTPException:
+    """A 404 here is nearly always stale data, so say that rather than just "not found".
+
+    The queue lives in this process. Restarting the service, or redeploying the chain, empties it
+    while the dashboard keeps rendering rows from MongoDB — so the row on screen is real and the
+    invoice behind it is gone.
+    """
+    if loop.state.ledger is None:
+        detail = (
+            f"{invoice_id} is not in the review queue — the agent has not run since it last "
+            "started, so its queue is empty. The row on screen is recorded history. Start the "
+            "agent, or clear old records with `npm run db:reset` in client/."
+        )
+    else:
+        known = [item["invoiceId"] for item in loop.review_queue()]
+        detail = (
+            f"{invoice_id} is not in the current run's review queue. "
+            f"Currently held: {', '.join(known) if known else 'nothing'}."
+        )
+    return HTTPException(404, detail)
+
+
 @app.post("/agent/review/{invoice_id}/approve")
 async def approve_review(invoice_id: str) -> dict[str, Any]:
     item = await loop.resolve_review(invoice_id, approved=True)
     if item is None:
-        raise HTTPException(404, f"no review item for {invoice_id}")
+        raise _no_such_item(invoice_id)
     return item
 
 
@@ -168,7 +190,7 @@ async def approve_review(invoice_id: str) -> dict[str, Any]:
 async def reject_review(invoice_id: str) -> dict[str, Any]:
     item = await loop.resolve_review(invoice_id, approved=False)
     if item is None:
-        raise HTTPException(404, f"no review item for {invoice_id}")
+        raise _no_such_item(invoice_id)
     return item
 
 

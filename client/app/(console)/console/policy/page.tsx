@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useConsole } from "@/components/console-data";
 import { Gauge } from "@/components/gauge";
 import { OwnerNotice, WriteStatus } from "@/components/write-status";
-import { formatFixed6, parseAmount } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { formatFixed2, parseAmount } from "@/lib/format";
 import { useOwnerWrite } from "@/lib/use-owner-write";
 
 /**
@@ -43,7 +44,7 @@ export default function PolicyPage() {
     const nextRolling = parseAmount(rolling);
 
     if (nextPerTx === null || nextRolling === null) {
-      setFormError("Enter both caps as plain amounts, up to six decimal places.");
+      setFormError("Enter both caps as plain amounts, up to two decimal places.");
       return;
     }
     if (nextPerTx > nextRolling) {
@@ -112,7 +113,7 @@ export default function PolicyPage() {
                 <span className="legend mt-2 block text-placard/45">{option.note}</span>
                 {effective !== null && (
                   <span className="tnum mt-1.5 block font-mono text-legend text-placard/60">
-                    {formatFixed6(effective)} per tx
+                    {formatFixed2(effective)} per tx
                   </span>
                 )}
               </button>
@@ -165,14 +166,9 @@ export default function PolicyPage() {
           )}
 
           <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="submit"
-              disabled={!canWrite || busy}
-              className="legend px-5 py-3 text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-              style={{ backgroundColor: "var(--color-hazard)" }}
-            >
+            <Button type="submit" variant="primary" disabled={!canWrite || busy}>
               Save caps
-            </button>
+            </Button>
             {write.pendingKey === "limits" || write.status === "error" ? (
               <WriteStatus
                 status={write.status}
@@ -209,7 +205,7 @@ function Field({
         {label}
       </label>
       <p className="tnum mt-1.5 font-mono text-legend text-placard/45">
-        Now {current ? formatFixed6(current) : "—"} mUSDC
+        Now {current ? formatFixed2(current) : "—"} mUSDC
       </p>
       <input
         id={id}

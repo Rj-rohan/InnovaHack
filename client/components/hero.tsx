@@ -1,5 +1,7 @@
 "use client";
 
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { ConnectButton } from "@/components/connect-button";
@@ -21,6 +23,43 @@ export function Hero() {
   // component. `useKillSwitch` opens its own EventSource on every call.
   const { data, freeze, paused, toggleFreeze, connectError } = useConsole();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const root = useRef<HTMLElement>(null);
+
+  /**
+   * One coordinated entrance, ~850ms.
+   *
+   * This replaced seven separate CSS animations running `1ms steps(1, end)` at staggered delays —
+   * which is a binary flip, not a transition, so the hero opened as seven discrete flashes and
+   * read as a rendering fault.
+   *
+   * `gsap.from()` throughout: the resting state lives in the CSS, so if JS never runs the hero is
+   * simply visible. The old version put `opacity: 0` in a keyframe, which was only safe because
+   * the animation was CSS too.
+   */
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const q = gsap.utils.selector(root);
+        const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+        tl.from(q("[data-hero='strip']"), { y: -8, opacity: 0, duration: 0.5 }, 0)
+          .from(q("[data-hero='word']"), { y: 24, opacity: 0, duration: 0.6, stagger: 0.07 }, 0.1)
+          .from(q("[data-hero='copy']"), { y: 14, opacity: 0, duration: 0.5, stagger: 0.06 }, 0.3)
+          // The switch keeps a mechanical overshoot — it is hardware seating, not text arriving.
+          .from(
+            q("[data-hero='switch']"),
+            { scale: 0.92, opacity: 0, duration: 0.5, ease: "back.out(1.6)" },
+            0.34,
+          )
+          .from(q("[data-hero='rail']"), { y: 16, opacity: 0, duration: 0.5 }, 0.42);
+      });
+
+      return () => mm.revert();
+    },
+    { scope: root },
+  );
 
   // Reduced motion holds the footage on its first frame rather than removing it. The frame is
   // still the right backdrop; it is the movement the visitor asked not to have.
@@ -57,7 +96,7 @@ export function Hero() {
   const state = data.state;
 
   return (
-    <section className="relative isolate flex min-h-svh flex-col overflow-hidden">
+    <section ref={root} className="relative isolate flex min-h-svh flex-col overflow-hidden">
       {/* --- Backplate. Treated until it reads as the same material as the chassis. --- */}
       <div className="hero-plate desat grain" aria-hidden="true">
         <video
@@ -78,7 +117,7 @@ export function Hero() {
       </div>
 
       {/* --- Instrument strip --- */}
-      <header className="relay relative z-10 mx-auto flex w-full max-w-384 flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-10 xl:px-16">
+      <header data-hero="strip" className="relative z-10 mx-auto flex w-full max-w-384 flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-10 xl:px-16">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <span className="legend text-placard/70">Kill Switch</span>
           <span className="flex items-center gap-2">
@@ -115,27 +154,27 @@ export function Hero() {
       <div className="relative z-10 mx-auto grid w-full max-w-384 flex-1 grid-cols-1 items-center gap-x-16 gap-y-14 px-6 py-10 sm:px-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:py-16 xl:grid-cols-[minmax(0,1.05fr)_auto_20rem] xl:px-16">
         <div className="max-w-xl">
           <h1 className="display text-display text-placard">
-            <span className="relay block" style={{ animationDelay: "90ms" }}>
+            <span data-hero="word" className="block">
               The
             </span>
-            <span className="relay block" style={{ animationDelay: "180ms" }}>
+            <span data-hero="word" className="block">
               Kill
             </span>
-            <span className="relay block" style={{ animationDelay: "270ms" }}>
+            <span data-hero="word" className="block">
               Switch
             </span>
           </h1>
 
           <p
-            className="relay mt-7 max-w-md text-lead text-placard"
-            style={{ animationDelay: "400ms" }}
+            data-hero="copy"
+            className="mt-7 max-w-md text-lead text-placard"
           >
             Spend limits your agent cannot argue with.
           </p>
 
           <p
-            className="relay mt-3 max-w-md text-body text-placard/75"
-            style={{ animationDelay: "440ms" }}
+            data-hero="copy"
+            className="mt-3 max-w-md text-body text-placard/75"
           >
             Every cap, every allowlisted counterparty and the freeze itself live in contract
             storage. A compromised agent does not get to skip the check, because nothing here asks
@@ -157,8 +196,8 @@ export function Hero() {
 
         {/* --- The switch. Outside .desat: the control stays vivid while the plant greys out. --- */}
         <div
-          className="seat flex flex-col items-center gap-5 justify-self-center lg:justify-self-end"
-          style={{ animationDelay: "480ms" }}
+          data-hero="switch"
+          className="flex flex-col items-center gap-5 justify-self-center lg:justify-self-end"
         >
           <div className="estop-mount">
             <Estop
@@ -183,8 +222,8 @@ export function Hero() {
 
         {/* --- The readings. Third zone: what the switch is governing. --- */}
         <div
-          className="relay desat w-full max-w-sm justify-self-center xl:max-w-none xl:justify-self-stretch"
-          style={{ animationDelay: "560ms" }}
+          data-hero="rail"
+          className="desat w-full max-w-sm justify-self-center xl:max-w-none xl:justify-self-stretch"
         >
           <InstrumentRail data={data} paused={paused} />
         </div>

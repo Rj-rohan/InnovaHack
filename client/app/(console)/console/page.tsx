@@ -7,7 +7,7 @@ import { Gauge } from "@/components/gauge";
 import { LockoutTag } from "@/components/lockout-tag";
 import { Stat } from "@/components/stat";
 import { Ticker } from "@/components/ticker";
-import { formatFixed6, shortenAddress } from "@/lib/format";
+import { formatFixed2, shortenAddress } from "@/lib/format";
 
 export default function ConsoleOverview() {
   const { data, freeze, paused, toggleFreeze, connectError } = useConsole();
@@ -45,18 +45,18 @@ export default function ConsoleOverview() {
         />
         <Stat
           legend="Per transaction"
-          value={state ? formatFixed6(state.perTxCap) : "—"}
+          value={state ? formatFixed2(state.perTxCap) : "—"}
           note="Effective cap, throttle applied"
         />
         <Stat
           legend="Remaining today"
-          value={state ? formatFixed6(state.remaining) : "—"}
+          value={state ? formatFixed2(state.remaining) : "—"}
           tone={state && BigInt(state.remaining) === 0n ? "stopped" : "normal"}
           note="Rolling 24 hours"
         />
         <Stat
           legend="Wallet balance"
-          value={state ? formatFixed6(state.balance) : "—"}
+          value={state ? formatFixed2(state.balance) : "—"}
           note="mUSDC held by the contract"
         />
       </section>

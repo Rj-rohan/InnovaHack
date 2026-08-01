@@ -11,7 +11,8 @@ import { Estop, EstopCaption } from "@/components/estop";
 import { Gauge } from "@/components/gauge";
 import { Shell } from "@/components/layout";
 import { LockoutTag } from "@/components/lockout-tag";
-import { formatFixed6 } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { formatFixed2 } from "@/lib/format";
 import { useAgent } from "@/lib/use-agent";
 
 /**
@@ -141,13 +142,13 @@ export function DemoStage() {
           </p>
 
           {/* --- Is it alive? ------------------------------------------- */}
-          <section className="mt-10">
+          <section className="settle mt-10">
             <h2 className="legend pb-3 text-placard/70">Agent</h2>
             <AgentStatusStrip agent={agent} />
           </section>
 
           {/* --- Scenarios ---------------------------------------------- */}
-          <section className="mt-10">
+          <section className="settle mt-10" style={{ animationDelay: "60ms" }}>
             <h2 className="legend pb-3 text-placard/70">Scenarios</h2>
             <div className="grid gap-4 lg:grid-cols-3">
               {SCENARIOS.map((scenario) => (
@@ -156,7 +157,7 @@ export function DemoStage() {
                     <span className="display text-lead leading-none text-placard/30">
                       {scenario.letter}
                     </span>
-                    <h3 className="heading text-body text-placard">{scenario.title}</h3>
+                    <h3 className="heading text-subhead text-placard">{scenario.title}</h3>
                   </div>
 
                   <p className="mt-3 flex-1 text-body text-placard/65">{scenario.expect}</p>
@@ -165,15 +166,16 @@ export function DemoStage() {
                     Expect <span className="text-hazard">{scenario.outcome}</span>
                   </p>
 
-                  <button
-                    type="button"
+                  {/* Secondary on purpose. These are three peers; the one primary on this
+                      page is Start agent. Three yellow fills side by side name nothing. */}
+                  <Button
+                    variant="secondary"
+                    className="mt-4 w-full"
                     disabled={offline || running !== null}
                     onClick={() => void run(scenario)}
-                    className="legend mt-4 px-4 py-3 text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{ backgroundColor: "var(--color-hazard)" }}
                   >
                     {running === scenario.id ? "Running…" : "Run"}
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -200,8 +202,9 @@ export function DemoStage() {
             )}
           </section>
 
+
           {/* --- The argument ------------------------------------------- */}
-          <section className="mt-12">
+          <section className="settle mt-12">
             <h2 className="legend text-placard/70">Decided, then ruled on</h2>
             <p className="measure mb-4 mt-2 text-body text-placard/55">
               What the agent intended, beside what the chain independently did about it.
@@ -210,7 +213,7 @@ export function DemoStage() {
           </section>
 
           {/* --- Thinking out loud -------------------------------------- */}
-          <section className="mt-12">
+          <section className="settle mt-12">
             <h2 className="legend pb-3 text-placard/70">Reasoning</h2>
             <LiveTrace ticks={agent.ticks} decisions={data.decisions} online={agent.online} />
           </section>
@@ -245,7 +248,7 @@ export function DemoStage() {
               <div className="flex items-baseline justify-between gap-3">
                 <span className="legend text-placard/45">Per tx</span>
                 <span className="tnum font-mono text-legend text-placard/80">
-                  {formatFixed6(state.perTxCap)}
+                  {formatFixed2(state.perTxCap)}
                 </span>
               </div>
             </div>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ConsoleDataProvider } from "@/components/console-data";
 import { Hero } from "@/components/hero";
 import { Shell } from "@/components/layout";
+import { SectionHeader } from "@/components/section-header";
 import { Reveal } from "@/components/reveal";
 import { ScrollRefresh } from "@/components/scroll-stage";
 import { ChecksExploded } from "@/components/sections/checks-exploded";
@@ -10,6 +11,7 @@ import { PaymentsRail } from "@/components/sections/payments-rail";
 import { ReceiptExpansion } from "@/components/sections/receipt-expansion";
 import { StorageContrast } from "@/components/sections/storage-contrast";
 import { OrbitingStack } from "@/components/ui/orbiting-circles";
+import { ButtonLink } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   description:
@@ -81,27 +83,17 @@ export default function LandingPage() {
       <section className="border-t border-black/40 py-20 lg:py-28">
         <Shell>
           <Reveal>
-            <h2 className="heading max-w-[20ch] text-panel text-placard">
-              Watch it refuse something
-            </h2>
-            <p className="measure mt-4 text-body text-placard/65">
-              The console shows live policy state and every payment attempt. The demo stage runs the
-              three scenarios end to end: a normal payment, an attack, and a freeze mid-flight.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/console"
-                className="legend px-5 py-3 text-ink transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "var(--color-hazard)" }}
-              >
+            <SectionHeader
+              title="Watch it refuse something"
+              lede="The console shows live policy state and every payment attempt. The demo stage runs the three scenarios end to end: a normal payment, an attack, and a freeze mid-flight."
+            />
+            <div className="mt-10 flex flex-wrap gap-3">
+              <ButtonLink href="/console" variant="primary">
                 Open the console
-              </Link>
-              <Link
-                href="/demo"
-                className="legend m-panel px-5 py-3 text-placard transition-colors hover:bg-enamel-lo"
-              >
+              </ButtonLink>
+              <ButtonLink href="/demo" variant="secondary">
                 Run the demo
-              </Link>
+              </ButtonLink>
             </div>
           </Reveal>
         </Shell>

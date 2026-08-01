@@ -7,6 +7,7 @@ import { DotField } from "@/components/ui/dot-field";
 import { useFreeze } from "@/lib/use-freeze";
 import { useKillSwitch } from "@/lib/use-kill-switch";
 import { useWalletConnection } from "@/lib/use-wallet-connection";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
 
 /**
@@ -70,29 +71,22 @@ export function SignInCard() {
             </p>
           </div>
         ) : !isConnected ? (
-          <button
-            type="button"
-            className="legend w-full px-5 py-3.5 text-ink transition-opacity hover:opacity-90 disabled:opacity-60"
-            style={{ backgroundColor: "var(--color-hazard)" }}
-            disabled={isPending}
-            onClick={openWallet}
-          >
+          <Button variant="primary" className="w-full" disabled={isPending} onClick={openWallet}>
             {isPending ? "Check your wallet…" : "Connect wallet"}
-          </button>
+          </Button>
         ) : wrongNetwork ? (
           <div>
             <p className="legend text-hazard">Wrong network</p>
             <p className="mt-2 text-body text-placard/70">
               The wallet lives on Sepolia. Switch, and this page updates itself.
             </p>
-            <button
-              type="button"
-              className="legend mt-4 w-full px-5 py-3.5 text-ink transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--color-hazard)" }}
+            <Button
+              variant="primary"
+              className="mt-4 w-full"
               onClick={() => switchChain({ chainId: sepolia.id })}
             >
               Switch to Sepolia
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -117,21 +111,13 @@ export function SignInCard() {
               <p className="legend text-placard/50">Waiting for the contract to answer</p>
             )}
 
-            <Link
-              href="/console"
-              className="legend w-full px-5 py-3.5 text-center text-ink transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--color-hazard)" }}
-            >
+            <ButtonLink href="/console" variant="primary" className="w-full">
               Open the console
-            </Link>
+            </ButtonLink>
 
-            <button
-              type="button"
-              className="legend w-full px-5 py-2.5 text-placard/55 transition-colors hover:text-placard"
-              onClick={() => disconnect()}
-            >
+            <Button variant="ghost" className="w-full" onClick={() => disconnect()}>
               Disconnect
-            </button>
+            </Button>
           </div>
         )}
 

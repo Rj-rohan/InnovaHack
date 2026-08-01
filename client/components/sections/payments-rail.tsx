@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useConsole } from "@/components/console-data";
 import { Shell } from "@/components/layout";
 import { ScrollStage } from "@/components/scroll-stage";
-import { explainReason, formatFixed6, shortenAddress } from "@/lib/format";
+import { explainReason, formatFixed2, shortenAddress } from "@/lib/format";
 
 /**
  * T2 — the live rail.
@@ -77,7 +77,7 @@ export function PaymentsRail() {
                     {blocked ? "Blocked" : row.status === "pending" ? "Sending" : "Paid"}
                   </span>
                   <span className="tnum font-mono text-body font-medium">
-                    {formatFixed6(row.amount)}
+                    {formatFixed2(row.amount)}
                   </span>
                 </div>
 

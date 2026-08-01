@@ -1,7 +1,7 @@
 "use client";
 
 import type { Decision, TxAttempt } from "@/lib/collections";
-import { explainReason, formatFixed6, shortenAddress, shortenHash, timeAgo } from "@/lib/format";
+import { explainReason, formatFixed2, shortenAddress, shortenHash, timeAgo } from "@/lib/format";
 
 /**
  * The agent's intent, beside the chain's verdict.
@@ -83,7 +83,7 @@ function DecisionVerdictRow({ pair, explorerBase }: { pair: Pair; explorerBase: 
           <p className="text-body italic text-ink">&ldquo;{decision.reasoning}&rdquo;</p>
         ) : (
           <p className="text-body text-ink-soft">
-            Proposed {formatFixed6(attempt.amount)} to{" "}
+            Proposed {formatFixed2(attempt.amount)} to{" "}
             {attempt.vendor ?? shortenAddress(attempt.to)}.
             {/* The model sometimes calls tools without narrating; say so rather than showing a
                 blank card that looks like a loading failure. */}
@@ -126,7 +126,7 @@ function DecisionVerdictRow({ pair, explorerBase }: { pair: Pair; explorerBase: 
           </p>
         ) : (
           <p className="mt-2 text-body text-ink-soft">
-            {formatFixed6(attempt.amount)} to {attempt.vendor ?? shortenAddress(attempt.to)}
+            {formatFixed2(attempt.amount)} to {attempt.vendor ?? shortenAddress(attempt.to)}
           </p>
         )}
 

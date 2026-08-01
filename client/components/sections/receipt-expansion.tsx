@@ -1,6 +1,7 @@
 "use client";
 
 import { Shell } from "@/components/layout";
+import { SectionHeader } from "@/components/section-header";
 import { ScrollStage } from "@/components/scroll-stage";
 
 /**
@@ -27,15 +28,11 @@ export function ReceiptExpansion() {
       }}
     >
       <Shell>
-        <p className="legend text-placard/55">Why a frozen batch is visible at all</p>
-        <h2 className="heading mt-3 max-w-[22ch] text-panel text-placard">
-          One path reverts. One path reports.
-        </h2>
-        <p className="measure mt-4 text-body text-placard/65">
-          A revert emits nothing. If a multi-step run were simply reverted, the blocked leg would
-          leave no trace and nobody reading the logs could prove the freeze worked. So batches stop
-          and say so instead.
-        </p>
+        <SectionHeader
+          eyebrow="Why a frozen batch is visible at all"
+          title="One path reverts. One path reports."
+          lede="A revert emits nothing. If a multi-step run were simply reverted, the blocked leg would leave no trace and nobody reading the logs could prove the freeze worked. So batches stop and say so instead."
+        />
       </Shell>
 
       <div data-receipts className="mt-12 origin-top">

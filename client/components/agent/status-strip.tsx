@@ -2,6 +2,7 @@
 
 import type { AgentControls } from "@/lib/use-agent";
 import type { AgentMode } from "@/lib/policy";
+import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
 
 /**
@@ -69,14 +70,13 @@ export function AgentStatusStrip({ agent }: { agent: AgentControls }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant={running ? "secondary" : "primary"}
+            size="sm"
             onClick={() => void (running ? agent.stop() : agent.start())}
-            className="legend px-4 py-2.5 text-ink transition-opacity hover:opacity-90"
-            style={{ backgroundColor: running ? "var(--color-placard-lo)" : "var(--color-hazard)" }}
           >
             {running ? "Stop agent" : "Start agent"}
-          </button>
+          </Button>
         </div>
       </div>
 

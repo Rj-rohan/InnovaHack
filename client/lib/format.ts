@@ -59,6 +59,33 @@ export function parseAmount(input: string): bigint | null {
   return BigInt(whole || "0") * 10n ** BigInt(DECIMALS) + BigInt(fraction.padEnd(DECIMALS, "0") || "0");
 }
 
+/**
+ * Two decimal places, trailing zeros kept: `38.00`, never `38` or `38.000000`.
+ *
+ * The display default. Six decimals is the token's true precision, but a column of `25.000000`
+ * reads as noise — four of those digits are always zero for amounts a human entered. Two aligns
+ * just as well and matches how money is written everywhere else in the product.
+ *
+ * `formatFixed6` remains for the rare place full precision genuinely matters.
+ */
+export function formatFixed2(value: string | bigint): string {
+  const raw = typeof value === "bigint" ? value : BigInt(value || "0");
+  const negative = raw < 0n;
+  const abs = negative ? -raw : raw;
+
+  const base = 10n ** BigInt(DECIMALS);
+  const whole = (abs / base).toLocaleString("en-US");
+  // Round half-up on the third decimal rather than truncating, so 0.005 shows as 0.01.
+  const hundredths = ((abs % base) + 5000n) / 10000n;
+  const carried = hundredths >= 100n;
+  const fraction = (carried ? 0n : hundredths).toString().padStart(2, "0");
+  const wholeAdjusted = carried
+    ? (abs / base + 1n).toLocaleString("en-US")
+    : whole;
+
+  return `${negative ? "-" : ""}${wholeAdjusted}.${fraction}`;
+}
+
 /** Percentage of a cap consumed, clamped to 100. Both arguments are base-unit strings. */
 export function percentOf(part: string | bigint, whole: string | bigint): number {
   const p = typeof part === "bigint" ? part : BigInt(part || "0");
