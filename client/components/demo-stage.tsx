@@ -54,6 +54,15 @@ const SCENARIOS = [
       "Starts a three-leg run with a pause between legs. Hold the switch while it runs and the rest never happens.",
     outcome: "WalletPaused",
   },
+  {
+    id: "f",
+    letter: "F",
+    title: "Key expiry mid-run",
+    path: "/demo/scenario/f",
+    expect:
+      "Grants a 15-second session key, runs 3 legs. Leg 1 succeeds, then the key expires naturally. Legs 2-3 are refused.",
+    outcome: "SessionInvalid",
+  },
 ] as const;
 
 const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:8000";

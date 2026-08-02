@@ -90,6 +90,54 @@ export const walletControlAbi = [
     outputs: [],
     stateMutability: "nonpayable",
   },
+  {
+    type: "function",
+    name: "setCounterpartyCap",
+    inputs: [
+      { name: "account", type: "address" },
+      { name: "cap", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "resetBlockedStreak",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "sessions",
+    inputs: [{ name: "key", type: "address" }],
+    outputs: [
+      { name: "active", type: "bool" },
+      { name: "expiresAt", type: "uint48" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "counterpartyCap",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "counterpartySpent24h",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "blockedStreak",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
 
   // --- Custom errors, so a revert can be named -----------------------------
   { type: "error", name: "NotOwner", inputs: [] },
@@ -124,6 +172,15 @@ export const walletControlAbi = [
     inputs: [
       { name: "attempted", type: "uint256" },
       { name: "available", type: "uint256" },
+    ],
+  },
+  {
+    type: "error",
+    name: "CounterpartyCapExceeded",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "attempted", type: "uint256" },
+      { name: "remaining", type: "uint256" },
     ],
   },
 ] as const;

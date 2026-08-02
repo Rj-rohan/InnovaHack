@@ -1,13 +1,13 @@
 {
   "deployed": true,
   "chainId": 31337,
-  "deployedAt": "2026-08-02T05:36:29.971Z",
-  "deployBlock": "2",
+  "deployedAt": "2026-08-02T06:15:01.414Z",
+  "deployBlock": "1159",
   "owner": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
   "agentSessionKey": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
   "contracts": {
-    "agentWallet": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
-    "mockUsdc": "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+    "agentWallet": "0x610178da211fef7d417bc0e6fed39f05609ad788",
+    "mockUsdc": "0x8a791620dd6260079bf849dc5567adc3f2fdc318"
   },
   "policy": {
     "perTxCap": "40000000",

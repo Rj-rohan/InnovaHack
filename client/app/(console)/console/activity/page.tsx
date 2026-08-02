@@ -42,15 +42,34 @@ export default function ActivityPage() {
     <div className="mx-auto flex max-w-384 flex-col gap-8">
       <header>
         <h1 className="heading text-panel text-placard">Activity</h1>
-        <p className="measure mt-2 text-body text-placard/65">
-          Every payment the agent attempted, and what the contract did about it.{" "}
-          {blockedCount > 0 && (
-            <>
-              <span className="text-estop">{blockedCount}</span> of {data.attempts.length} were
-              refused.
-            </>
-          )}
-        </p>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+          <p className="measure text-body text-placard/65">
+            Every payment the agent attempted, and what the contract did about it.{" "}
+            {blockedCount > 0 && (
+              <>
+                <span className="text-estop">{blockedCount}</span> of {data.attempts.length} were
+                refused.
+              </>
+            )}
+          </p>
+          <div className="flex gap-2">
+            <a
+              href="/api/audit?fmt=csv"
+              download
+              className="legend m-panel px-3.5 py-2 text-placard/70 transition-colors hover:text-placard"
+            >
+              Export CSV
+            </a>
+            <a
+              href="/api/audit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="legend m-panel px-3.5 py-2 text-placard/70 transition-colors hover:text-placard"
+            >
+              Export JSON
+            </a>
+          </div>
+        </div>
       </header>
 
       {/* The pairing goes above the flat feed: intent-beside-verdict is the reading that matters,

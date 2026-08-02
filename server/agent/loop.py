@@ -33,6 +33,7 @@ class AgentState:
     tick: int = 0
     last_provider: str | None = None
     last_error: str | None = None
+    last_tick_at: str | None = None
     subscribers: list[asyncio.Queue] = field(default_factory=list)
     #: AP state — persists across ticks so invoices can arrive over time. See `_ensure_ledger`.
     ledger: "Ledger | None" = None
@@ -46,6 +47,7 @@ class AgentState:
             "tick": self.tick,
             "lastProvider": self.last_provider,
             "lastError": self.last_error,
+            "lastTickAt": self.last_tick_at,
         }
 
 
@@ -352,6 +354,8 @@ async def run_tick() -> dict[str, Any]:
         )
 
     _emit("tick_end", {"tick": tick, "provider": provider_used})
+
+    state.last_tick_at = datetime.now(timezone.utc).isoformat()
 
     return {
         "tick": tick,

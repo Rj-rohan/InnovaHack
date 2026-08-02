@@ -1,14 +1,102 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { isAddress, stringToHex } from "viem";
+import { isAddress, parseUnits, formatUnits, stringToHex } from "viem";
+import { useReadContract } from "wagmi";
 import { useConsole } from "@/components/console-data";
 import { OwnerNotice, WriteStatus } from "@/components/write-status";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
 import { useOwnerWrite } from "@/lib/use-owner-write";
+import { walletControlAbi } from "@/lib/wallet-abi";
 
 const ZERO_TAG = `0x${"0".repeat(64)}` as const;
+
+function CounterpartyCapRow({
+  address,
+  walletAddress,
+  canWrite,
+  busy,
+  onSave,
+}: {
+  address: string;
+  walletAddress: `0x${string}` | undefined;
+  canWrite: boolean;
+  busy: boolean;
+  onSave: (address: string, cap: bigint) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [capInput, setCapInput] = useState("");
+
+  const capQuery = useReadContract({
+    address: walletAddress,
+    abi: walletControlAbi,
+    functionName: "counterpartyCap",
+    args: [address as `0x${string}`],
+    query: { enabled: Boolean(walletAddress) },
+  });
+  const spentQuery = useReadContract({
+    address: walletAddress,
+    abi: walletControlAbi,
+    functionName: "counterpartySpent24h",
+    args: [address as `0x${string}`],
+    query: { enabled: Boolean(walletAddress), refetchInterval: 8000 },
+  });
+
+  const cap = capQuery.data as bigint | undefined;
+  const spent = spentQuery.data as bigint | undefined;
+  const hasCap = cap !== undefined && cap > 0n;
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-3">
+        {hasCap ? (
+          <span className="font-mono text-legend text-placard/55">
+            Cap: {formatUnits(cap, 6)} · Spent: {spent !== undefined ? formatUnits(spent, 6) : "…"}
+          </span>
+        ) : (
+          <span className="legend text-placard/30">No individual cap</span>
+        )}
+        {canWrite && (
+          <button
+            type="button"
+            onClick={() => { setEditing(true); setCapInput(hasCap ? formatUnits(cap, 6) : ""); }}
+            className="legend text-placard/45 underline underline-offset-2 hover:text-placard"
+          >
+            {hasCap ? "Edit" : "Set cap"}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        value={capInput}
+        onChange={(e) => setCapInput(e.target.value)}
+        placeholder="0.00"
+        className="m-well w-24 px-2 py-1 font-mono text-legend text-placard"
+      />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          const parsed = parseFloat(capInput);
+          if (!isNaN(parsed) && parsed >= 0) {
+            onSave(address, parseUnits(capInput || "0", 6));
+            setEditing(false);
+          }
+        }}
+        className="legend px-3 py-1 text-placard"
+        style={{ backgroundColor: "var(--color-hazard)" }}
+      >
+        Save
+      </button>
+      <button type="button" onClick={() => setEditing(false)} className="legend text-placard/45 hover:text-placard">Cancel</button>
+    </div>
+  );
+}
 
 /**
  * The allowlist.
@@ -27,6 +115,7 @@ export default function CounterpartiesPage() {
 
   const canWrite = freeze.isOwner;
   const busy = write.status === "signing" || write.status === "pending";
+  const walletAddress = data.contracts?.agentWallet as `0x${string}` | undefined;
 
   const groups = useMemo(() => {
     const entries = data.state?.allowlist ?? [];
@@ -119,41 +208,54 @@ export default function CounterpartiesPage() {
                 {entries.map((entry) => (
                   <li
                     key={entry.address}
-                    className="m-placard flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3"
+                    className="m-placard flex flex-col gap-2 px-4 py-3"
                   >
-                    <div className="min-w-0">
-                      <p className="text-body font-medium">{entry.label || "Unlabelled"}</p>
-                      <p className="font-mono text-legend text-ink-soft" title={entry.address}>
-                        {shortenAddress(entry.address)}
-                      </p>
-                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                      <div className="min-w-0">
+                        <p className="text-body font-medium">{entry.label || "Unlabelled"}</p>
+                        <p className="font-mono text-legend text-ink-soft" title={entry.address}>
+                          {shortenAddress(entry.address)}
+                        </p>
+                      </div>
 
-                    <div className="flex items-center gap-4">
-                      <span
-                        className="legend"
-                        style={{
-                          color: entry.enabled
-                            ? "var(--color-running-ink)"
-                            : "var(--color-estop-ink)",
-                        }}
-                      >
-                        {entry.enabled ? "Payable" : "Blocked"}
-                      </span>
+                      <div className="flex items-center gap-4">
+                        <span
+                          className="legend"
+                          style={{
+                            color: entry.enabled
+                              ? "var(--color-running-ink)"
+                              : "var(--color-estop-ink)",
+                          }}
+                        >
+                          {entry.enabled ? "Payable" : "Blocked"}
+                        </span>
 
-                      <button
-                        type="button"
-                        disabled={!canWrite || busy}
-                        onClick={() => {
-                          void write
-                            .send("setCounterparty", [entry.address, ZERO_TAG], `rm:${entry.address}`)
-                            .then((ok) => ok && data.refresh());
-                        }}
-                        className="legend underline decoration-ink-soft/40 underline-offset-2 transition-colors enabled:hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
-                        style={{ color: "var(--color-estop-ink)" }}
-                      >
-                        Remove
-                      </button>
+                        <button
+                          type="button"
+                          disabled={!canWrite || busy}
+                          onClick={() => {
+                            void write
+                              .send("setCounterparty", [entry.address, ZERO_TAG], `rm:${entry.address}`)
+                              .then((ok) => ok && data.refresh());
+                          }}
+                          className="legend underline decoration-ink-soft/40 underline-offset-2 transition-colors enabled:hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
+                          style={{ color: "var(--color-estop-ink)" }}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
+                    <CounterpartyCapRow
+                      address={entry.address}
+                      walletAddress={walletAddress}
+                      canWrite={canWrite}
+                      busy={busy}
+                      onSave={(addr, cap) => {
+                        void write
+                          .send("setCounterpartyCap", [addr, cap], `cap:${addr}`)
+                          .then((ok) => ok && data.refresh());
+                      }}
+                    />
                   </li>
                 ))}
               </ul>

@@ -19,9 +19,11 @@ export type WriteStatus = "idle" | "signing" | "pending" | "done" | "error";
 type OwnerFunction =
   | "setLimits"
   | "setCounterparty"
+  | "setCounterpartyCap"
   | "setTagEnabled"
   | "grantSession"
-  | "revokeSession";
+  | "revokeSession"
+  | "resetBlockedStreak";
 
 function describeRevert(name: string, args: readonly unknown[] | undefined): string {
   const [a, b] = (args ?? []) as [unknown, unknown];

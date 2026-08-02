@@ -297,6 +297,42 @@ async def threat_status() -> dict[str, Any]:
         "remainingUsdc": round(from_base_units(snapshot.remaining), 2),
         "spentUsdc": round(from_base_units(snapshot.spent_in_window), 2),
     }
+
+
+@app.get("/agent/watchdog")
+async def watchdog() -> dict[str, Any]:
+    """Agent health check — detects silent crashes."""
+    from config import get_settings
+    settings = get_settings()
+    last_tick = loop.state.last_tick_at
+    overdue = False
+    seconds_since_tick = None
+
+    if last_tick:
+        from datetime import datetime, timezone
+        last_dt = datetime.fromisoformat(last_tick)
+        now = datetime.now(timezone.utc)
+        seconds_since_tick = (now - last_dt).total_seconds()
+        overdue = loop.state.running and seconds_since_tick > settings.tick_seconds * 3
+
+    if overdue:
+        await ingest.send_alert(
+            reason="Agent overdue — possible silent crash",
+            tx_hash=None,
+            extra={"secondsSinceTick": seconds_since_tick, "expectedInterval": settings.tick_seconds},
+        )
+
+    return {
+        "running": loop.state.running,
+        "lastTickAt": last_tick,
+        "secondsSinceTick": round(seconds_since_tick, 1) if seconds_since_tick is not None else None,
+        "expectedIntervalSeconds": settings.tick_seconds,
+        "overdue": overdue,
+        "lastError": loop.state.last_error,
+    }
+
+
+@app.post("/demo/scenario/a")
 async def scenario_a() -> dict[str, Any]:
     """Normal operation — the agent pays an allowlisted vendor and it goes through."""
     loop.set_mode("normal")
@@ -432,4 +468,94 @@ async def scenario_c(legs: int = 3, amount_usdc: float = 20.0) -> dict[str, Any]
         "legs": legs,
         "amountUsdc": amount_usdc,
         "note": "Run started. Hit FREEZE from the dashboard — the remaining legs will revert.",
+    }
+
+
+@app.post("/demo/scenario/f")
+async def scenario_f() -> dict[str, Any]:
+    """Scenario F — session key expiry mid-run.
+
+    Grants a 15-second session key, starts a 3-leg run with 10s between legs.
+    Leg 1 succeeds. After leg 1 the chain clock is advanced past the expiry.
+    Legs 2-3 revert with SessionInvalid — from natural expiry, not manual revocation.
+    """
+    chain = get_chain()
+    deployment = get_deployment()
+    profile = get_chain_profile(deployment.chain_id)
+    parties = deployment.counterparties
+
+    if not parties:
+        raise HTTPException(500, "no counterparties in the deployment record")
+    if not profile.allow_time_travel:
+        raise HTTPException(400, "Scenario F requires a local dev chain (chain 31337).")
+
+    from config import to_base_units
+    from eth_account import Account
+
+    # Grant a 15-second session key using the well-known local owner key
+    owner_key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    owner_account = Account.from_key(owner_key)
+    now_ts = chain.w3.eth.get_block("latest")["timestamp"]
+    expires_at = now_ts + 15
+
+    wallet_contract = chain.w3.eth.contract(
+        address=chain.w3.to_checksum_address(deployment.wallet_address),
+        abi=deployment.wallet_abi,
+    )
+    nonce = chain.w3.eth.get_transaction_count(owner_account.address, "pending")
+    base_fee = chain.w3.eth.get_block("latest").get("baseFeePerGas", 0) or 0
+    priority = chain.w3.to_wei(2, "gwei")
+    tx = wallet_contract.functions.grantSession(
+        chain.w3.to_checksum_address(chain.address), expires_at
+    ).build_transaction({
+        "from": owner_account.address,
+        "nonce": nonce,
+        "gas": 100_000,
+        "maxPriorityFeePerGas": priority,
+        "maxFeePerGas": base_fee * 2 + priority,
+        "chainId": deployment.chain_id,
+    })
+    signed = owner_account.sign_transaction(tx)
+    chain.w3.eth.send_raw_transaction(signed.raw_transaction)
+
+    loop.set_mode("normal")
+    amount = to_base_units(15.0)
+
+    async def run_legs() -> None:
+        for i in range(3):
+            party = parties[i % len(parties)]
+            try:
+                tx_hash = chain.send_payment(party["address"], amount)
+                if not tx_hash.startswith("0x"):
+                    tx_hash = "0x" + tx_hash
+                status, error = "pending", None
+            except Exception as exc:  # noqa: BLE001
+                tx_hash, status, error = None, "blocked", str(exc)[:200]
+
+            loop.emit("payment", {
+                "tick": loop.state.tick, "to": party["address"],
+                "vendor": party["label"], "amountUsdc": 15.0,
+                "txHash": tx_hash, "status": status, "leg": i,
+            })
+            await ingest.record_tx_attempt(
+                run_id=loop.state.run_id, tick=loop.state.tick, tx_hash=tx_hash,
+                sender=chain.address, to=party["address"], vendor=party["label"],
+                amount=amount, status=status, reason=error, mode="normal",
+            )
+
+            # After leg 1, advance chain time past the key expiry
+            if i == 0:
+                await asyncio.sleep(2)
+                chain.w3.provider.make_request("evm_increaseTime", [20])
+                chain.w3.provider.make_request("evm_mine", [])
+                loop.emit("time_travel", {"note": "Session key expired — next legs get SessionInvalid"})
+            else:
+                await asyncio.sleep(2)
+
+    asyncio.create_task(run_legs())
+    return {
+        "started": True,
+        "keyExpiresInSeconds": 15,
+        "legs": 3,
+        "note": "Leg 1 succeeds. Key expires after leg 1. Legs 2-3 revert with SessionInvalid.",
     }
