@@ -56,6 +56,7 @@ const ERROR_TO_REASON: Record<string, string> = {
   SpendLimitExceeded: "PerTxCapExceeded",
   RollingLimitExceeded: "RollingCapExceeded",
   InsufficientBalance: "InsufficientBalance",
+  CounterpartyCapExceeded: "CounterpartyCapExceeded",
   SpendHistoryFull: "SpendHistoryFull",
   NotOwner: "NotOwner",
   EmptyBatch: "EmptyBatch",

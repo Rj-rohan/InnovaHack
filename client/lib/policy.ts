@@ -16,6 +16,7 @@ export const BLOCK_REASONS = [
   "PerTxCapExceeded",
   "RollingCapExceeded",
   "InsufficientBalance",
+  "CounterpartyCapExceeded",
 ] as const;
 
 export type BlockReason = (typeof BLOCK_REASONS)[number];

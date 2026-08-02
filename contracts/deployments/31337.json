@@ -1,6 +1,6 @@
 {
   "chainId": 31337,
-  "deployedAt": "2026-08-01T18:01:51.632Z",
+  "deployedAt": "2026-08-02T05:36:29.971Z",
   "deployBlock": "2",
   "owner": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
   "agentSessionKey": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
@@ -57,6 +57,27 @@
         ],
         "stateMutability": "nonpayable",
         "type": "constructor"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "attempted",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "remaining",
+            "type": "uint256"
+          }
+        ],
+        "name": "CounterpartyCapExceeded",
+        "type": "error"
       },
       {
         "inputs": [
@@ -198,6 +219,19 @@
           }
         ],
         "name": "AgentUnpaused",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": false,
+            "internalType": "uint8",
+            "name": "streak",
+            "type": "uint8"
+          }
+        ],
+        "name": "AutoPaused",
         "type": "event"
       },
       {
@@ -410,6 +444,19 @@
       },
       {
         "inputs": [],
+        "name": "AUTO_PAUSE_THRESHOLD",
+        "outputs": [
+          {
+            "internalType": "uint8",
+            "name": "",
+            "type": "uint8"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
         "name": "BPS_DENOMINATOR",
         "outputs": [
           {
@@ -428,6 +475,57 @@
           {
             "internalType": "uint256",
             "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "blockedStreak",
+        "outputs": [
+          {
+            "internalType": "uint8",
+            "name": "",
+            "type": "uint8"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "name": "counterpartyCap",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          }
+        ],
+        "name": "counterpartySpent24h",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "total",
             "type": "uint256"
           }
         ],
@@ -693,6 +791,13 @@
         "type": "function"
       },
       {
+        "inputs": [],
+        "name": "resetBlockedStreak",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
         "inputs": [
           {
             "internalType": "address",
@@ -769,6 +874,24 @@
           }
         ],
         "name": "setCounterparty",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "cap",
+            "type": "uint256"
+          }
+        ],
+        "name": "setCounterpartyCap",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -864,6 +987,29 @@
           {
             "internalType": "bool",
             "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "threatSnapshot",
+        "outputs": [
+          {
+            "internalType": "uint8",
+            "name": "streak",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint8",
+            "name": "threshold",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bool",
+            "name": "autoTriggered",
             "type": "bool"
           }
         ],

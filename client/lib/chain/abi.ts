@@ -34,6 +34,27 @@ export const agentWalletAbi = [
         "internalType": "address",
         "name": "to",
         "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "attempted",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "remaining",
+        "type": "uint256"
+      }
+    ],
+    "name": "CounterpartyCapExceeded",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
       }
     ],
     "name": "CounterpartyNotAllowed",
@@ -168,6 +189,19 @@ export const agentWalletAbi = [
       }
     ],
     "name": "AgentUnpaused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "streak",
+        "type": "uint8"
+      }
+    ],
+    "name": "AutoPaused",
     "type": "event"
   },
   {
@@ -380,6 +414,19 @@ export const agentWalletAbi = [
   },
   {
     "inputs": [],
+    "name": "AUTO_PAUSE_THRESHOLD",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "BPS_DENOMINATOR",
     "outputs": [
       {
@@ -398,6 +445,57 @@ export const agentWalletAbi = [
       {
         "internalType": "uint256",
         "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "blockedStreak",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "counterpartyCap",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "counterpartySpent24h",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "total",
         "type": "uint256"
       }
     ],
@@ -663,6 +761,13 @@ export const agentWalletAbi = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "resetBlockedStreak",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -739,6 +844,24 @@ export const agentWalletAbi = [
       }
     ],
     "name": "setCounterparty",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "cap",
+        "type": "uint256"
+      }
+    ],
+    "name": "setCounterpartyCap",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -834,6 +957,29 @@ export const agentWalletAbi = [
       {
         "internalType": "bool",
         "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "threatSnapshot",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "streak",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "threshold",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bool",
+        "name": "autoTriggered",
         "type": "bool"
       }
     ],

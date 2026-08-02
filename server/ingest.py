@@ -10,6 +10,7 @@ Losing a log line is acceptable; halting the agent because a UI is unreachable i
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import httpx
@@ -46,6 +47,29 @@ async def _post(path: str, payload: dict[str, Any]) -> None:
             log.warning("ingest %s -> %s %s", path, response.status_code, response.text[:200])
     except httpx.HTTPError as exc:
         log.warning("ingest %s unreachable: %s", path, exc)
+
+
+async def send_alert(reason: str, tx_hash: str | None, extra: dict[str, Any] | None = None) -> None:
+    """Fire a webhook when the contract auto-pauses or blocks a streak of payments.
+
+    Set ALERT_WEBHOOK_URL in server/.env to any URL that accepts a POST with JSON.
+    Slack incoming webhooks, Discord webhooks, and generic HTTP endpoints all work.
+    Best-effort: a failed webhook never stops the agent.
+    """
+    webhook_url = os.getenv("ALERT_WEBHOOK_URL")
+    if not webhook_url:
+        return
+    payload: dict[str, Any] = {
+        "alert": "AgentWallet policy violation",
+        "reason": reason,
+        "txHash": tx_hash,
+    }
+    if extra:
+        payload.update(extra)
+    try:
+        await _http().post(webhook_url, json=payload)
+    except httpx.HTTPError as exc:
+        log.warning("alert webhook failed: %s", exc)
 
 
 async def record_decision(

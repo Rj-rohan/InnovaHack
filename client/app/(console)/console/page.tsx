@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useConsole } from "@/components/console-data";
 import { Estop, EstopCaption } from "@/components/estop";
 import { Gauge } from "@/components/gauge";
@@ -8,6 +9,93 @@ import { LockoutTag } from "@/components/lockout-tag";
 import { Stat } from "@/components/stat";
 import { Ticker } from "@/components/ticker";
 import { formatFixed2, shortenAddress } from "@/lib/format";
+
+const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:8000";
+
+interface ThreatState {
+  blockedStreak: number;
+  autoPauseThreshold: number;
+  autoTriggered: boolean;
+  paused: boolean;
+  remainingUsdc: number;
+  spentUsdc: number;
+}
+
+function ThreatPanel() {
+  const [threat, setThreat] = useState<ThreatState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const res = await fetch(`${AGENT_URL}/agent/threat`);
+        if (res.ok && !cancelled) setThreat(await res.json());
+      } catch { /* agent offline */ }
+    }
+    void poll();
+    const id = setInterval(() => void poll(), 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  if (!threat) return null;
+
+  const streakPct = Math.min((threat.blockedStreak / threat.autoPauseThreshold) * 100, 100);
+  const streakTone = threat.blockedStreak === 0 ? "normal" : threat.blockedStreak >= threat.autoPauseThreshold ? "stopped" : "caution";
+
+  return (
+    <section className="m-panel px-6 py-5">
+      <h2 className="legend text-placard/70">Threat Monitor</h2>
+      <p className="legend mt-1 text-placard/40">
+        Contract auto-pauses after {threat.autoPauseThreshold} consecutive blocked attempts.
+      </p>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div>
+          <p className="legend text-placard/55">Blocked streak</p>
+          <p
+            className="heading mt-1 text-lead leading-none"
+            style={{
+              color: streakTone === "stopped" ? "var(--color-estop)" : streakTone === "caution" ? "var(--color-hazard)" : undefined,
+            }}
+          >
+            {threat.blockedStreak} / {threat.autoPauseThreshold}
+          </p>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-enamel-lo">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${streakPct}%`,
+                backgroundColor: streakTone === "stopped" ? "var(--color-estop)" : streakTone === "caution" ? "var(--color-hazard)" : "var(--color-running)",
+              }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <p className="legend text-placard/55">Auto-pause</p>
+          <p
+            className="heading mt-1 text-lead leading-none"
+            style={{ color: threat.autoTriggered ? "var(--color-estop)" : undefined }}
+          >
+            {threat.autoTriggered ? "Triggered" : "Armed"}
+          </p>
+          <p className="legend mt-1 text-placard/40">
+            {threat.autoTriggered ? "Contract self-paused" : "Watching for streak"}
+          </p>
+        </div>
+
+        <div>
+          <p className="legend text-placard/55">Remaining today</p>
+          <p className="heading mt-1 text-lead leading-none">
+            {threat.remainingUsdc.toFixed(2)}
+            <span className="legend ml-1 text-placard/40">mUSDC</span>
+          </p>
+          <p className="legend mt-1 text-placard/40">{threat.spentUsdc.toFixed(2)} spent</p>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function ConsoleOverview() {
   const { data, freeze, paused, toggleFreeze, connectError } = useConsole();
@@ -60,6 +148,8 @@ export default function ConsoleOverview() {
           note="mUSDC held by the contract"
         />
       </section>
+
+      <ThreatPanel />
 
       <section className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
         <div className="m-panel px-6 py-6">

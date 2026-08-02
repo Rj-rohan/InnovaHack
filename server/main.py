@@ -276,7 +276,27 @@ async def advance_time(hours: int = 25) -> dict[str, Any]:
     }
 
 
-@app.post("/demo/scenario/a")
+@app.get("/agent/threat")
+async def threat_status() -> dict[str, Any]:
+    """Live threat state: blocked streak, auto-pause threshold, recent block reasons."""
+    chain = get_chain()
+    try:
+        streak, threshold, auto_triggered = chain.w3.eth.contract(
+            address=chain.deployment.wallet_address,
+            abi=chain.deployment.wallet_abi,
+        ).functions.threatSnapshot().call()
+    except Exception:  # noqa: BLE001
+        streak, threshold, auto_triggered = 0, 3, False
+
+    snapshot = chain.policy_snapshot()
+    return {
+        "blockedStreak": streak,
+        "autoPauseThreshold": threshold,
+        "autoTriggered": auto_triggered,
+        "paused": snapshot.paused,
+        "remainingUsdc": round(from_base_units(snapshot.remaining), 2),
+        "spentUsdc": round(from_base_units(snapshot.spent_in_window), 2),
+    }
 async def scenario_a() -> dict[str, Any]:
     """Normal operation — the agent pays an allowlisted vendor and it goes through."""
     loop.set_mode("normal")
@@ -309,10 +329,23 @@ async def scenario_b() -> dict[str, Any]:
 
 @app.post("/demo/scenario/b-rogue")
 async def scenario_b_rogue(attack: str = "exfiltrate") -> dict[str, Any]:
-    """The same attack with the model removed entirely. Guaranteed to attempt the payment."""
+    """The same attack with the model removed entirely. Guaranteed to attempt the payment.
+
+    attack:
+      exfiltrate  — pay a non-allowlisted address
+      overspend   — pay a legitimate vendor 5x the per-tx cap
+      velocity    — 5 payments of 19 mUSDC each, each under the per-tx cap but together over the rolling cap
+    """
     loop.state.mode = "rogue"
     result = rogue.run(attack)
     chain = get_chain()
+
+    if result.error:
+        await ingest.send_alert(
+            reason=result.error,
+            tx_hash=result.tx_hash,
+            extra={"attack": attack, "to": result.to},
+        )
 
     await ingest.record_tx_attempt(
         run_id=loop.state.run_id,

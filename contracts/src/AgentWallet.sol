@@ -39,7 +39,8 @@ contract AgentWallet is ReentrancyGuard {
         CounterpartyNotAllowed,
         PerTxCapExceeded,
         RollingCapExceeded,
-        InsufficientBalance
+        InsufficientBalance,
+        CounterpartyCapExceeded
     }
 
     struct Session {
@@ -99,6 +100,18 @@ contract AgentWallet is ReentrancyGuard {
     /// group ("exchange", "vendor") in one transaction instead of address by address.
     mapping(bytes32 => bool) public tagEnabled;
 
+    /// @notice Per-counterparty rolling 24h spend cap. Zero means no individual cap.
+    mapping(address => uint256) public counterpartyCap;
+    /// @notice Spend ring buffer per counterparty (4 slots — enough for a demo).
+    mapping(address => Spend[4]) private _counterpartySpends;
+    mapping(address => uint8) private _counterpartySpendIdx;
+
+    /// @notice How many consecutive blocked attempts the agent has made.
+    /// Resets to zero on any successful payment.
+    uint8 public blockedStreak;
+    /// @notice After this many consecutive blocks the contract pauses itself.
+    uint8 public constant AUTO_PAUSE_THRESHOLD = 3;
+
     Spend[SPEND_SLOTS] private _spends;
     uint8 private _spendIdx;
 
@@ -110,6 +123,7 @@ contract AgentWallet is ReentrancyGuard {
     event PaymentBlocked(
         uint256 indexed index, address indexed by, address indexed to, uint256 amount, BlockReason reason
     );
+    event AutoPaused(uint8 streak);
     event AgentPaused(address indexed by);
     event AgentUnpaused(address indexed by);
     event SessionGranted(address indexed key, uint48 expiresAt);
@@ -132,6 +146,7 @@ contract AgentWallet is ReentrancyGuard {
     error SpendLimitExceeded(uint256 attempted, uint256 cap);
     error RollingLimitExceeded(uint256 attempted, uint256 remaining);
     error InsufficientBalance(uint256 attempted, uint256 available);
+    error CounterpartyCapExceeded(address to, uint256 attempted, uint256 remaining);
     error SpendHistoryFull();
     error InvalidThrottle();
     error ZeroAddress();
@@ -208,6 +223,17 @@ contract AgentWallet is ReentrancyGuard {
         emit CounterpartyUpdated(account, tag);
     }
 
+    /// @notice Set a per-counterparty rolling 24h cap. Pass 0 to remove the individual cap.
+    function setCounterpartyCap(address account, uint256 cap) external onlyOwner {
+        if (account == address(0)) revert ZeroAddress();
+        counterpartyCap[account] = cap;
+    }
+
+    /// @notice Reset the blocked streak counter. Useful after investigating an incident.
+    function resetBlockedStreak() external onlyOwner {
+        blockedStreak = 0;
+    }
+
     function setTagEnabled(bytes32 tag, bool enabled) external onlyOwner {
         tagEnabled[tag] = enabled;
         emit TagUpdated(tag, enabled);
@@ -236,9 +262,13 @@ contract AgentWallet is ReentrancyGuard {
     /// @notice Execute a single payment. Reverts if it violates any policy rule.
     function pay(address to, uint256 amount) external nonReentrant {
         (BlockReason reason, uint256 context) = _check(msg.sender, to, amount);
-        if (reason != BlockReason.None) _revertFor(reason, msg.sender, to, amount, context);
+        if (reason != BlockReason.None) {
+            _recordBlock();
+            _revertFor(reason, msg.sender, to, amount, context);
+        }
 
-        _record(amount);
+        blockedStreak = 0;
+        _record(amount, to);
         policyToken.safeTransfer(to, amount);
         emit PaymentExecuted(msg.sender, to, amount, counterpartyTag[to]);
     }
@@ -259,11 +289,13 @@ contract AgentWallet is ReentrancyGuard {
             // next leg sees it.
             (BlockReason reason,) = _check(msg.sender, to, amount);
             if (reason != BlockReason.None) {
+                _recordBlock();
                 emit PaymentBlocked(i, msg.sender, to, amount, reason);
                 return;
             }
 
-            _record(amount);
+            blockedStreak = 0;
+            _record(amount, to);
             policyToken.safeTransfer(to, amount);
             emit PaymentExecuted(msg.sender, to, amount, counterpartyTag[to]);
         }
@@ -312,6 +344,15 @@ contract AgentWallet is ReentrancyGuard {
         return reason;
     }
 
+    /// @notice Rolling 24h spend to a specific counterparty.
+    function counterpartySpent24h(address account) public view returns (uint256 total) {
+        uint256 cutoff = block.timestamp > WINDOW ? block.timestamp - WINDOW : 0;
+        Spend[4] storage spends = _counterpartySpends[account];
+        for (uint256 i = 0; i < 4; i++) {
+            if (spends[i].ts != 0 && uint256(spends[i].ts) >= cutoff) total += spends[i].amount;
+        }
+    }
+
     /// @notice Whole policy state in one call, so the agent and dashboard need one RPC round trip
     /// per tick instead of eight.
     function policySnapshot()
@@ -334,6 +375,17 @@ contract AgentWallet is ReentrancyGuard {
         spentInWindow = rolling24h();
         remaining = dayCap > spentInWindow ? dayCap - spentInWindow : 0;
         balance = policyToken.balanceOf(address(this));
+    }
+
+    /// @notice Extended snapshot including threat state.
+    function threatSnapshot()
+        external
+        view
+        returns (uint8 streak, uint8 threshold, bool autoTriggered)
+    {
+        streak = blockedStreak;
+        threshold = AUTO_PAUSE_THRESHOLD;
+        autoTriggered = paused && blockedStreak >= AUTO_PAUSE_THRESHOLD;
     }
 
     // ---------------------------------------------------------------------
@@ -367,6 +419,15 @@ contract AgentWallet is ReentrancyGuard {
             return (BlockReason.RollingCapExceeded, dayCap > spent ? dayCap - spent : 0);
         }
 
+        // Per-counterparty cap check.
+        uint256 cpCap = counterpartyCap[to];
+        if (cpCap > 0) {
+            uint256 cpSpent = counterpartySpent24h(to);
+            if (cpSpent + amount > cpCap) {
+                return (BlockReason.CounterpartyCapExceeded, cpCap > cpSpent ? cpCap - cpSpent : 0);
+            }
+        }
+
         uint256 balance = policyToken.balanceOf(address(this));
         if (balance < amount) return (BlockReason.InsufficientBalance, balance);
 
@@ -382,24 +443,39 @@ contract AgentWallet is ReentrancyGuard {
         if (reason == BlockReason.CounterpartyNotAllowed) revert CounterpartyNotAllowed(to);
         if (reason == BlockReason.PerTxCapExceeded) revert SpendLimitExceeded(amount, context);
         if (reason == BlockReason.RollingCapExceeded) revert RollingLimitExceeded(amount, context);
+        if (reason == BlockReason.CounterpartyCapExceeded) revert CounterpartyCapExceeded(to, amount, context);
         revert InsufficientBalance(amount, context);
     }
 
-    /// @dev Append a spend to the ring buffer. Called BEFORE the external transfer
-    /// (checks-effects-interactions), so a hostile token cannot re-enter and spend against a
-    /// window that has not yet been debited.
-    function _record(uint256 amount) internal {
+    /// @dev Append a spend to the global ring buffer and the per-counterparty ring buffer.
+    /// Called BEFORE the external transfer (checks-effects-interactions).
+    function _record(uint256 amount, address to) internal {
         uint256 cutoff = block.timestamp > WINDOW ? block.timestamp - WINDOW : 0;
         uint8 idx = _spendIdx;
         Spend storage slot = _spends[idx];
 
-        // `idx` always points at the oldest entry. If even that one is still inside the window,
-        // all 32 slots are live and overwriting one would silently under-count the window and let
-        // spending drift past the cap. Fail closed instead.
         if (slot.ts != 0 && uint256(slot.ts) >= cutoff) revert SpendHistoryFull();
 
         slot.ts = uint48(block.timestamp);
         slot.amount = uint208(amount);
         _spendIdx = uint8((uint256(idx) + 1) % SPEND_SLOTS);
+
+        // Per-counterparty ring buffer (4 slots).
+        if (counterpartyCap[to] > 0) {
+            uint8 cpIdx = _counterpartySpendIdx[to];
+            Spend storage cpSlot = _counterpartySpends[to][cpIdx];
+            cpSlot.ts = uint48(block.timestamp);
+            cpSlot.amount = uint208(amount);
+            _counterpartySpendIdx[to] = uint8((uint256(cpIdx) + 1) % 4);
+        }
+    }
+
+    /// @dev Track blocked streak and auto-pause if threshold is reached.
+    function _recordBlock() internal {
+        blockedStreak++;
+        if (blockedStreak >= AUTO_PAUSE_THRESHOLD && !paused) {
+            paused = true;
+            emit AutoPaused(blockedStreak);
+        }
     }
 }
