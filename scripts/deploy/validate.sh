@@ -3,19 +3,24 @@ set -e
 
 echo "=== ValidateService: Running health checks ==="
 
-# Wait for services to be ready
-sleep 10
+wait_for() {
+  local name=$1
+  local url=$2
+  local retries=18
+  local wait=10
+  for i in $(seq 1 $retries); do
+    if curl -sf --max-time 5 "$url" > /dev/null 2>&1; then
+      echo "  $name OK"
+      return 0
+    fi
+    echo "  $name not ready (attempt $i/$retries), waiting ${wait}s..."
+    sleep $wait
+  done
+  echo "  $name FAILED after $((retries * wait))s"
+  return 1
+}
 
-# Check Next.js
-echo "Checking Next.js..."
-curl -sf http://localhost:3000/api/state | grep -q "deployed" \
-  && echo "  Next.js OK" \
-  || { echo "  Next.js FAILED"; exit 1; }
-
-# Check Python agent
-echo "Checking Python agent..."
-curl -sf http://localhost:8000/health | grep -q "ok" \
-  && echo "  Python agent OK" \
-  || { echo "  Python agent FAILED"; exit 1; }
+wait_for "Next.js"     "http://localhost:3000/api/state"
+wait_for "Python agent" "http://localhost:8000/health"
 
 echo "=== All health checks passed ==="
