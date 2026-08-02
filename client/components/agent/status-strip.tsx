@@ -61,7 +61,6 @@ export function AgentStatusStrip({ agent }: { agent: AgentControls }) {
           {status && (
             <>
               <Reading label="Tick" value={String(status.tick)} />
-              <Reading label="Provider" value={status.lastProvider ?? "—"} />
               {status.sessionKey && (
                 <Reading label="Agent key" value={shortenAddress(status.sessionKey)} />
               )}
@@ -81,6 +80,34 @@ export function AgentStatusStrip({ agent }: { agent: AgentControls }) {
       </div>
 
       <hr className="rule-engraved my-4" />
+
+      {/* Which model is serving, and what it can fall back to.
+          Failover is a reliability feature and reads as one — hiding it would only make a mid-demo
+          provider switch look like a fault. The serving provider is highlighted; the rest are
+          standing by. */}
+      {status && status.providers.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="legend mr-1 text-placard/45">Model</span>
+          {status.providers.map((provider) => {
+            const serving = provider === status.lastProvider;
+            return (
+              <span
+                key={provider}
+                className={`legend px-3 py-2 ${
+                  serving ? "bg-placard text-ink" : "m-well text-placard/50"
+                }`}
+                title={serving ? "Serving this tick" : "Standing by"}
+              >
+                {provider}
+                {serving && " ·  live"}
+              </span>
+            );
+          })}
+          {status.providers.length > 1 && (
+            <span className="legend text-placard/35">falls over automatically</span>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="legend mr-1 text-placard/45">Mode</span>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@/components/connect-button";
 import { useConsole } from "@/components/console-data";
-import { Estop } from "@/components/estop";
+import { Estop, EstopCaption } from "@/components/estop";
 import { formatBlockNumber } from "@/lib/format";
 
 type Led = "running" | "caution" | "stopped" | "off";
@@ -133,15 +133,18 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-4">
             <ConnectButton />
             <div className="flex items-center gap-2.5">
-              {/* Must agree with the cap face. Saying "Hold to freeze" beside a switch that will
-                  open a wallet is the same defect as labelling the cap "Stop" when disconnected. */}
-              <span className="legend hidden text-placard/60 sm:inline">
-                {!freeze.connected
-                  ? "Hold to connect"
-                  : paused
-                    ? "Hold to release"
-                    : "Hold to freeze"}
-              </span>
+              {/* Must agree with the cap face — and, critically, must say when the connected
+                  wallet isn't the owner. A non-owner press reverts with NotOwner() and this is
+                  the one place in the console that used to say nothing about why. */}
+              <div className="hidden sm:block">
+                <EstopCaption
+                  paused={paused}
+                  status={freeze.status}
+                  connected={freeze.connected}
+                  isOwner={freeze.isOwner}
+                  error={freeze.error}
+                />
+              </div>
               <Estop
                 variant="bar"
                 paused={paused}

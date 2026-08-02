@@ -49,12 +49,33 @@ export interface AgentTick {
   at: string;
 }
 
+/**
+ * One leg of a multi-leg demo run, as it lands.
+ *
+ * Scenarios C and F fire sequential on-chain payments seconds apart and emit a `payment` event per
+ * leg. Capturing them is what turns "hit freeze at some point" into a visible before-and-after:
+ * legs already paid, the leg in flight, and the ones that never happened.
+ */
+export interface LegEvent {
+  leg: number;
+  vendor?: string;
+  amountUsdc?: number;
+  txHash?: string | null;
+  status?: string;
+  at: string;
+}
+
 export interface AgentControls {
   /** null while the first probe is in flight. */
   online: boolean | null;
   status: AgentStatus | null;
   /** Newest first. Live only — history comes from `decisions[]` in the database. */
   ticks: AgentTick[];
+  /** Legs of the run currently in flight, ascending. Cleared by `resetLegs()` on a new run. */
+  legs: LegEvent[];
+  /** Set when the agent reports the session key expiring part-way through a run. */
+  timeTravelNote: string | null;
+  resetLegs: () => void;
   error: string | null;
   start: () => Promise<void>;
   stop: () => Promise<void>;
@@ -124,6 +145,8 @@ export function useAgent(): AgentControls {
   const [online, setOnline] = useState<boolean | null>(null);
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [ticks, setTicks] = useState<AgentTick[]>([]);
+  const [legs, setLegs] = useState<LegEvent[]>([]);
+  const [timeTravelNote, setTimeTravelNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
 
@@ -195,6 +218,44 @@ export function useAgent(): AgentControls {
       source.addEventListener(name, handle as EventListener);
     }
 
+    // Multi-leg demo runs. Upserted by leg index rather than appended: a leg is emitted once as
+    // pending and the reducer must not stack duplicates if the agent re-emits.
+    source.addEventListener("payment", ((raw: MessageEvent) => {
+      try {
+        const payload = JSON.parse(raw.data);
+        const data = (payload.data ?? payload) as Record<string, unknown>;
+        if (typeof data.leg !== "number") return;
+
+        const entry: LegEvent = {
+          leg: data.leg,
+          vendor: typeof data.vendor === "string" ? data.vendor : undefined,
+          amountUsdc: typeof data.amountUsdc === "number" ? data.amountUsdc : undefined,
+          txHash: (data.txHash as string | null) ?? null,
+          status: typeof data.status === "string" ? data.status : undefined,
+          at: payload.at ?? new Date().toISOString(),
+        };
+
+        setLegs((current) => {
+          const next = current.filter((l) => l.leg !== entry.leg);
+          next.push(entry);
+          return next.sort((a, b) => a.leg - b.leg);
+        });
+      } catch {
+        /* a malformed frame is not worth tearing the feed down for */
+      }
+    }) as EventListener);
+
+    // The session key expiring mid-run is the point of scenario F, not an incident.
+    source.addEventListener("time_travel", ((raw: MessageEvent) => {
+      try {
+        const payload = JSON.parse(raw.data);
+        const data = (payload.data ?? payload) as Record<string, unknown>;
+        setTimeTravelNote(typeof data.note === "string" ? data.note : null);
+      } catch {
+        /* ignore */
+      }
+    }) as EventListener);
+
     source.addEventListener("error", ((raw: MessageEvent) => {
       try {
         const payload = JSON.parse(raw.data);
@@ -236,6 +297,12 @@ export function useAgent(): AgentControls {
     online,
     status,
     ticks,
+    legs,
+    timeTravelNote,
+    resetLegs: () => {
+      setLegs([]);
+      setTimeTravelNote(null);
+    },
     error,
     start: async () => void (await post("/agent/start")),
     stop: async () => void (await post("/agent/stop")),

@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { AgentStatusStrip } from "@/components/agent/status-strip";
 import { DecisionVerdictList } from "@/components/agent/decision-verdict";
 import { LiveTrace } from "@/components/agent/live-trace";
+import { RunProgress } from "@/components/agent/run-progress";
 import { ConnectButton } from "@/components/connect-button";
 import { useConsole } from "@/components/console-data";
 import { Estop, EstopCaption } from "@/components/estop";
@@ -75,6 +76,9 @@ export function DemoStage() {
 
   const [running, setRunning] = useState<string | null>(null);
   const [log, setLog] = useState<TraceLine[]>([]);
+  // How many legs the scenario in flight said it would fire, so the progress list can show the
+  // ones that never happened rather than only the ones that did.
+  const [expectedLegs, setExpectedLegs] = useState<number | null>(null);
 
   const say = useCallback((text: string, tone: TraceLine["tone"] = "note") => {
     setLog((lines) => [{ id: Date.now() + Math.random(), text, tone }, ...lines].slice(0, 12));
@@ -82,11 +86,17 @@ export function DemoStage() {
 
   async function run(scenario: (typeof SCENARIOS)[number]) {
     setRunning(scenario.id);
+    setExpectedLegs(null);
+    agent.resetLegs();
     say(`Scenario ${scenario.letter} — ${scenario.title}`);
 
     try {
       const response = await fetch(`${AGENT_URL}${scenario.path}`, { method: "POST" });
       const payload = await response.json();
+
+      // Multi-leg scenarios report how many legs they will fire; that turns the live `payment`
+      // events into a progress list with a known denominator.
+      if (typeof payload.legs === "number") setExpectedLegs(payload.legs);
 
       if (!response.ok) {
         say(payload.detail ?? "The agent could not run that scenario", "bad");
@@ -189,6 +199,14 @@ export function DemoStage() {
               ))}
             </div>
 
+            {expectedLegs !== null && (
+              <RunProgress
+                legs={agent.legs}
+                expected={expectedLegs}
+                note={agent.timeTravelNote}
+              />
+            )}
+
             {log.length > 0 && (
               <ul className="m-well mt-4 flex flex-col gap-1.5 px-4 py-3.5" aria-live="polite">
                 {log.map((line) => (
@@ -218,7 +236,12 @@ export function DemoStage() {
             <p className="measure mb-4 mt-2 text-body text-placard/55">
               What the agent intended, beside what the chain independently did about it.
             </p>
-            <DecisionVerdictList decisions={data.decisions} attempts={data.attempts} limit={5} />
+            <DecisionVerdictList
+              decisions={data.decisions}
+              attempts={data.attempts}
+              reviewItems={data.reviewItems}
+              limit={5}
+            />
           </section>
 
           {/* --- Thinking out loud -------------------------------------- */}

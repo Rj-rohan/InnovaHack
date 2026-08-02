@@ -80,7 +80,12 @@ export default function ActivityPage() {
           <p className="measure mb-4 mt-2 text-body text-placard/55">
             What the agent intended, beside what the chain independently did about it.
           </p>
-          <DecisionVerdictList decisions={data.decisions} attempts={data.attempts} limit={4} />
+          <DecisionVerdictList
+            decisions={data.decisions}
+            attempts={data.attempts}
+            reviewItems={data.reviewItems}
+            limit={4}
+          />
         </section>
       )}
 
