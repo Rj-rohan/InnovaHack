@@ -12,7 +12,7 @@ npm ci --omit=dev
 # --- Server (Python) ---
 echo "Setting up Python virtual environment..."
 cd $APP_DIR/server
-python3.11 -m venv .venv
+python3 -m venv .venv
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
 
