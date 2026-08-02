@@ -3,6 +3,14 @@ set -e
 
 echo "=== BeforeInstall: Installing system dependencies ==="
 
+# Add swap if not already present (prevents OOM kills on small instances)
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+fi
+
 # Purge broken package records left by CodeDeploy agent self-installer and
 # any conflicting curl/libcurl packages before touching apt further.
 dpkg --remove --force-remove-reinstreq codedeploy-agent 2>/dev/null || true

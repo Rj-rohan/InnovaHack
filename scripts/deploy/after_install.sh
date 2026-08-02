@@ -7,7 +7,7 @@ echo "=== AfterInstall: Setting up application ==="
 # --- Client (Next.js) ---
 echo "Installing client dependencies..."
 cd $APP_DIR/client
-npm ci --omit=dev
+NODE_OPTIONS="--max-old-space-size=512" npm ci --omit=dev
 
 # --- Server (Python) ---
 echo "Setting up Python virtual environment..."
