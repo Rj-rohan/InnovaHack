@@ -12,6 +12,9 @@ echo "Installing client dependencies..."
 cd $APP_DIR/client
 NODE_OPTIONS="--max-old-space-size=512" npm ci --omit=dev
 
+echo "Building Next.js client..."
+NODE_OPTIONS="--max-old-space-size=512" npm run build
+
 # --- Server (Python) ---
 echo "Setting up Python virtual environment..."
 cd $APP_DIR/server
