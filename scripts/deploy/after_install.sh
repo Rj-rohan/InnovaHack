@@ -43,4 +43,7 @@ node scripts/sync-chain.mjs
 echo "Initialising MongoDB indexes..."
 npm run db:init
 
+# Fix ownership so ubuntu user owns everything including installed deps
+chown -R ubuntu:ubuntu $APP_DIR
+
 echo "=== AfterInstall complete ==="
