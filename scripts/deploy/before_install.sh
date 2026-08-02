@@ -23,9 +23,9 @@ apt-get update
 # Reinstall curl cleanly now that conflicts are cleared
 apt-get install -y curl
 
-# Install Node.js 20 via nodesource
-if ! command -v node &> /dev/null || [[ "$(node --version)" != v20* ]]; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+# Install Node.js 22 via nodesource
+if ! command -v node &> /dev/null || [[ "$(node --version)" != v22* ]]; then
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
 fi
 
