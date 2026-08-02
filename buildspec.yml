@@ -15,15 +15,14 @@ phases:
       - echo Writing env files from SSM Parameter Store...
       - aws ssm get-parameter --name "/killswitch/client-env" --with-decryption --query Parameter.Value --output text > client/.env.local
       - aws ssm get-parameter --name "/killswitch/server-env" --with-decryption --query Parameter.Value --output text > server/.env
-      - echo Building Next.js client...
-      - cd client && npm run build && cd ..
+      - echo Env files written.
 
   build:
     commands:
-      - echo Packaging artifacts...
-
-  post_build:
-    commands:
+      - echo Building Next.js client...
+      - cd client
+      - npm run build
+      - cd ..
       - echo Build complete.
 
 artifacts:
