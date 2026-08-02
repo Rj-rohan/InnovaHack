@@ -5,11 +5,16 @@ echo "=== BeforeInstall: Installing system dependencies ==="
 
 # Add swap if not already present (prevents OOM kills on small instances)
 if [ ! -f /swapfile ]; then
-  fallocate -l 2G /swapfile
+  fallocate -l 1G /swapfile
   chmod 600 /swapfile
   mkswap /swapfile
   swapon /swapfile
 fi
+
+# Free disk space before installing packages
+apt-get clean
+rm -rf /var/cache/apt/archives/*.deb /tmp/* /var/tmp/*
+journalctl --vacuum-size=50M 2>/dev/null || true
 
 # Purge broken package records left by CodeDeploy agent self-installer and
 # any conflicting curl/libcurl packages before touching apt further.
