@@ -23,16 +23,16 @@ npm ci
 
 # --- Deploy local chain contracts ---
 echo "Starting temporary Hardhat node for deployment..."
-npm run node &
+npm run node > /tmp/hardhat-install.log 2>&1 &
 HARDHAT_PID=$!
 sleep 5
 
 echo "Deploying contracts..."
-npm run deploy:local
+npm run deploy:local > /tmp/hardhat-deploy.log 2>&1
 
 echo "Stopping temporary Hardhat node..."
-kill $HARDHAT_PID || true
-sleep 2
+kill $HARDHAT_PID 2>/dev/null || true
+wait $HARDHAT_PID 2>/dev/null || true
 
 # --- Sync chain addresses to client ---
 echo "Syncing chain addresses..."
