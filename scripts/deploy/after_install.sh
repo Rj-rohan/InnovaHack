@@ -4,6 +4,9 @@ set -e
 APP_DIR=/home/ubuntu/killswitch
 echo "=== AfterInstall: Setting up application ==="
 
+# Remove stale Next.js build so old chunks don't persist alongside new ones
+rm -rf $APP_DIR/client/.next
+
 # --- Client (Next.js) ---
 echo "Installing client dependencies..."
 cd $APP_DIR/client
