@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local chain deployment — regenerated on every sync:chain, machine-specific.
+/lib/chain/deployment.json

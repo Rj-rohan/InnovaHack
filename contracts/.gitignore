@@ -14,6 +14,8 @@
 .env.*
 !.env.example
 
-# Deployment records ARE committed — client/ and server/ read addresses and ABIs from them,
-# and 31337.json is what a fresh clone needs to run the local demo without redeploying.
+# Local dev chain deployment — regenerated on every deploy:local, machine-specific.
+/deployments/31337.json
+
+# Public network deployments (Sepolia etc.) are committed — they are shared and stable.
 
