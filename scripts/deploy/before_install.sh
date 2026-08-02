@@ -3,8 +3,10 @@ set -e
 
 echo "=== BeforeInstall: Installing system dependencies ==="
 
-# Fix any broken package state before doing anything else
-apt-get --fix-broken install -y || true
+# The CodeDeploy agent installs itself via a .deb that requires old Ruby versions
+# not available on Ubuntu 24.04. Since the agent is already running (it's executing
+# this script), forcibly remove its broken apt record to unblock apt.
+dpkg --remove --force-remove-reinstreq codedeploy-agent 2>/dev/null || true
 apt-get clean
 apt-get update
 
@@ -19,7 +21,6 @@ if ! command -v python3.11 &> /dev/null; then
   apt-get install -y python3.11 python3.11-venv python3-pip
 fi
 
-# Install git
 apt-get install -y git
 
 # Clean previous deployment if exists
