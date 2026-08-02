@@ -3,12 +3,17 @@ set -e
 
 echo "=== BeforeInstall: Installing system dependencies ==="
 
-# The CodeDeploy agent installs itself via a .deb that requires old Ruby versions
-# not available on Ubuntu 24.04. Since the agent is already running (it's executing
-# this script), forcibly remove its broken apt record to unblock apt.
+# Purge broken package records left by CodeDeploy agent self-installer and
+# any conflicting curl/libcurl packages before touching apt further.
 dpkg --remove --force-remove-reinstreq codedeploy-agent 2>/dev/null || true
+dpkg --remove --force-remove-reinstreq curl 2>/dev/null || true
+dpkg --remove --force-remove-reinstreq libcurl4t64 2>/dev/null || true
+dpkg --configure -a 2>/dev/null || true
 apt-get clean
 apt-get update
+
+# Reinstall curl cleanly now that conflicts are cleared
+apt-get install -y curl
 
 # Install Node.js 20 via nodesource
 if ! command -v node &> /dev/null || [[ "$(node --version)" != v20* ]]; then
