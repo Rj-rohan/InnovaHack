@@ -1,0 +1,32 @@
+version: 0.0
+os: linux
+
+files:
+  - source: /
+    destination: /home/ubuntu/killswitch
+
+hooks:
+  BeforeInstall:
+    - location: scripts/deploy/before_install.sh
+      timeout: 300
+      runas: root
+
+  AfterInstall:
+    - location: scripts/deploy/after_install.sh
+      timeout: 600
+      runas: ubuntu
+
+  ApplicationStart:
+    - location: scripts/deploy/start.sh
+      timeout: 300
+      runas: ubuntu
+
+  ApplicationStop:
+    - location: scripts/deploy/stop.sh
+      timeout: 60
+      runas: ubuntu
+      
+  ValidateService:
+    - location: scripts/deploy/validate.sh
+      timeout: 60
+      runas: ubuntu

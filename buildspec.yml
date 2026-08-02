@@ -1,0 +1,47 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+      python: 3.11
+    commands:
+      - echo Installing dependencies...
+      - cd client && npm ci && cd ..
+      - cd server && pip install -r requirements.txt && cd ..
+
+  pre_build:
+    commands:
+      - echo Writing env files from SSM Parameter Store...
+      - aws ssm get-parameter --name "/killswitch/client-env" --with-decryption --query Parameter.Value --output text > client/.env.local
+      - aws ssm get-parameter --name "/killswitch/server-env" --with-decryption --query Parameter.Value --output text > server/.env
+      - echo Building Next.js client...
+      - cd client && npm run build && cd ..
+
+  build:
+    commands:
+      - echo Packaging artifacts...
+
+  post_build:
+    commands:
+      - echo Build complete.
+
+artifacts:
+  files:
+    - client/**/*
+    - server/**/*
+    - contracts/**/*
+    - appspec.yml
+    - scripts/deploy/**/*
+  exclude-paths:
+    - client/node_modules/**/*
+    - server/.venv/**/*
+    - contracts/node_modules/**/*
+    - contracts/artifacts/**/*
+    - contracts/cache/**/*
+  discard-paths: no
+
+cache:
+  paths:
+    - client/node_modules/**/*
+    - server/.venv/**/*
