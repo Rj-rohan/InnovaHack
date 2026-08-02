@@ -21,10 +21,8 @@ if ! command -v node &> /dev/null || [[ "$(node --version)" != v20* ]]; then
   apt-get install -y nodejs
 fi
 
-# Install Python 3 (3.12 is the default on Ubuntu 24.04)
-if ! command -v python3 &> /dev/null; then
-  apt-get install -y python3 python3-venv python3-pip
-fi
+# Install python3-venv for whatever python3 version is present
+apt-get install -y python3-venv python3-pip
 
 apt-get install -y git
 
