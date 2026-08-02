@@ -1,0 +1,73 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+      python: 3.11
+    commands:
+      - echo Installing dependencies...
+      - cd client && npm ci && cd ..
+      - cd server && pip install -r requirements.txt && cd ..
+      - cd contracts && npm ci && cd ..
+
+  pre_build:
+    commands:
+      - echo Writing env files from SSM Parameter Store...
+      - aws ssm get-parameter --name "/killswitch/client-env" --with-decryption --query Parameter.Value --output text > client/.env.local
+      - aws ssm get-parameter --name "/killswitch/server-env" --with-decryption --query Parameter.Value --output text > server/.env
+      - echo Env files written.
+
+      - echo Creating placeholder deployment files for build...
+      - mkdir -p contracts/deployments
+      - |
+        cat > contracts/deployments/31337.json << 'EOF'
+        {
+          "deployed": false,
+          "chainId": 31337,
+          "deployedAt": "1970-01-01T00:00:00.000Z",
+          "deployBlock": "0",
+          "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+          "agentSessionKey": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+          "contracts": {
+            "agentWallet": "0x0000000000000000000000000000000000000001",
+            "mockUsdc": "0x0000000000000000000000000000000000000002"
+          },
+          "policy": {
+            "perTxCap": "40000000",
+            "rollingCap": "100000000",
+            "decimals": 6
+          },
+          "counterparties": [],
+          "abi": {
+            "agentWallet": [],
+            "mockUsdc": []
+          }
+        }
+        EOF
+      - mkdir -p client/lib/chain
+      - cp contracts/deployments/31337.json client/lib/chain/deployment.json
+
+  build:
+    commands:
+      - echo Build phase skipped - Next.js is built on the EC2 instance during deployment.
+
+artifacts:
+  files:
+    - client/**/*
+    - server/**/*
+    - contracts/**/*
+    - appspec.yml
+    - scripts/deploy/**/*
+  exclude-paths:
+    - client/node_modules/**/*
+    - server/.venv/**/*
+    - contracts/node_modules/**/*
+    - contracts/artifacts/**/*
+    - contracts/cache/**/*
+  discard-paths: no
+
+cache:
+  paths:
+    - client/node_modules/**/*
+    - server/.venv/**/*
